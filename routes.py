@@ -1,15 +1,21 @@
-import os
-from flask import render_template, request, redirect, url_for, flash, jsonify, session
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 import uuid
 import logging
+import csv
+import io
+import json
+import random
+import os
 
 from app import db
 from models import (
     User, Role, Store, Product, Category, Inventory,
-    Sale, SaleItem, Customer, Payment, Supplier
+    Sale, SaleItem, Customer, Payment, Supplier,
+    ProductTemplate, LabelTemplate
 )
 from auth import (
     login_required, admin_required, manager_required,
@@ -833,11 +839,377 @@ def register_routes(app):
             db.session.rollback()
             return jsonify({'status': 'Error', 'message': str(e)}), 500
     
+    # Inventory enhancement routes for bulk imports, templates and barcodes
+    @app.route('/inventory/import', methods=['GET', 'POST'])
+    @manager_required
+    def import_products():
+        """Bulk import products page."""
+        if request.method == 'POST':
+            if 'file' not in request.files:
+                flash('No file part', 'danger')
+                return redirect(request.url)
+                
+            file = request.files['file']
+            
+            if file.filename == '':
+                flash('No selected file', 'danger')
+                return redirect(request.url)
+                
+            if file and (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+                # Process the file
+                try:
+                    # For simplicity, we'll only handle CSV files for now
+                    if file.filename.endswith('.csv'):
+                        # Get column mappings from form
+                        column_name = request.form.get('column_name')
+                        column_description = request.form.get('column_description')
+                        column_sku = request.form.get('column_sku')
+                        column_barcode = request.form.get('column_barcode')
+                        column_selling_price = request.form.get('column_selling_price')
+                        column_cost_price = request.form.get('column_cost_price')
+                        column_tax_rate = request.form.get('column_tax_rate')
+                        column_category = request.form.get('column_category')
+                        column_quantity = request.form.get('column_quantity')
+                        
+                        # Get default values
+                        default_category_id = request.form.get('default_category_id')
+                        default_tax_rate = request.form.get('default_tax_rate', 16.0)
+                        default_supplier_id = request.form.get('default_supplier_id')
+                        default_quantity = request.form.get('default_quantity', 0)
+                        default_reorder_level = request.form.get('default_reorder_level', 5)
+                        
+                        # Parse CSV
+                        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+                        csv_reader = csv.reader(stream)
+                        
+                        # Skip header row if indicated
+                        if request.form.get('header_row'):
+                            next(csv_reader)
+                            
+                        # Process each row
+                        products_added = 0
+                        errors = []
+                        categories_cache = {category.name.lower(): category.id for category in Category.query.all()}
+                        
+                        for row in csv_reader:
+                            try:
+                                # Extract data based on column mappings
+                                name = row[int(column_name)] if column_name else None
+                                description = row[int(column_description)] if column_description and int(column_description) < len(row) else None
+                                sku = row[int(column_sku)] if column_sku and int(column_sku) < len(row) else f"SKU-{uuid.uuid4().hex[:8].upper()}"
+                                barcode = row[int(column_barcode)] if column_barcode and int(column_barcode) < len(row) else None
+                                
+                                selling_price = row[int(column_selling_price)] if column_selling_price and int(column_selling_price) < len(row) else 0
+                                cost_price = row[int(column_cost_price)] if column_cost_price and int(column_cost_price) < len(row) else 0
+                                tax_rate = row[int(column_tax_rate)] if column_tax_rate and int(column_tax_rate) < len(row) else default_tax_rate
+                                
+                                category_name = row[int(column_category)] if column_category and int(column_category) < len(row) else None
+                                quantity = row[int(column_quantity)] if column_quantity and int(column_quantity) < len(row) else default_quantity
+                                
+                                # Skip rows without a product name
+                                if not name:
+                                    continue
+                                    
+                                # Determine category ID
+                                category_id = default_category_id
+                                if category_name:
+                                    category_name_lower = category_name.lower()
+                                    if category_name_lower in categories_cache:
+                                        category_id = categories_cache[category_name_lower]
+                                    else:
+                                        # Create new category if it doesn't exist
+                                        new_category = Category(name=category_name)
+                                        db.session.add(new_category)
+                                        db.session.flush()
+                                        category_id = new_category.id
+                                        categories_cache[category_name_lower] = category_id
+                                
+                                # Generate barcode if not provided
+                                if not barcode:
+                                    # Generate a unique EAN-13 barcode
+                                    barcode = "590"  # Example prefix
+                                    for _ in range(9):
+                                        barcode += str(random.randint(0, 9))
+                                    
+                                    # Calculate check digit
+                                    total = 0
+                                    for i, digit in enumerate(barcode):
+                                        total += int(digit) * (1 if i % 2 == 0 else 3)
+                                    check_digit = (10 - (total % 10)) % 10
+                                    barcode += str(check_digit)
+                                
+                                # Create product
+                                product = Product(
+                                    name=name,
+                                    description=description or f"Description for {name}",
+                                    sku=sku,
+                                    barcode=barcode,
+                                    selling_price=float(selling_price),
+                                    cost_price=float(cost_price),
+                                    tax_rate=float(tax_rate),
+                                    category_id=category_id,
+                                    supplier_id=default_supplier_id,
+                                    is_active=True
+                                )
+                                db.session.add(product)
+                                db.session.flush()  # Get product ID without committing
+                                
+                                # Create inventory entry for current store
+                                inventory = Inventory(
+                                    product_id=product.id,
+                                    store_id=session.get('store_id'),
+                                    quantity=int(quantity),
+                                    reorder_level=int(default_reorder_level),
+                                    last_restock_date=datetime.utcnow() if int(quantity) > 0 else None
+                                )
+                                db.session.add(inventory)
+                                products_added += 1
+                                
+                            except Exception as e:
+                                errors.append(f"Error processing row: {str(e)}")
+                                continue
+                        
+                        if products_added > 0:
+                            db.session.commit()
+                            flash(f'Successfully imported {products_added} products. {len(errors)} errors occurred.', 'success')
+                        else:
+                            db.session.rollback()
+                            flash('No products were imported. Please check your file and mapping.', 'warning')
+                            
+                        if errors:
+                            for error in errors[:5]:  # Show first 5 errors
+                                flash(error, 'warning')
+                            if len(errors) > 5:
+                                flash(f'... and {len(errors) - 5} more errors. Check the log for details.', 'warning')
+                                for error in errors:
+                                    logging.error(error)
+                    
+                    return redirect(url_for('inventory'))
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error importing products: {str(e)}', 'danger')
+                    logging.error(f"Error importing products: {str(e)}")
+                    return redirect(request.url)
+            else:
+                flash('File type not supported. Please upload a CSV or Excel file.', 'danger')
+                return redirect(request.url)
+                
+        # GET request - render the form
+        categories = Category.query.all()
+        suppliers = Supplier.query.all()
+        
+        return render_template(
+            'inventory/import.html',
+            categories=categories,
+            suppliers=suppliers
+        )
+        
+    @app.route('/inventory/templates', methods=['GET'])
+    @manager_required
+    def product_templates():
+        """Product templates page."""
+        templates = ProductTemplate.query.all()
+        categories = Category.query.all()
+        suppliers = Supplier.query.all()
+        
+        return render_template(
+            'inventory/templates.html',
+            templates=templates,
+            categories=categories,
+            suppliers=suppliers
+        )
+        
+    @app.route('/inventory/create-product-template', methods=['POST'])
+    @manager_required
+    def create_product_template():
+        """Create a new product template."""
+        try:
+            name = request.form.get('name')
+            description = request.form.get('description')
+            category_id = request.form.get('category_id') or None
+            supplier_id = request.form.get('supplier_id') or None
+            tax_rate = request.form.get('tax_rate', 16.0)
+            reorder_level = request.form.get('reorder_level', 5)
+            sku_prefix = request.form.get('sku_prefix', '')
+            description_template = request.form.get('description_template', '')
+            
+            template = ProductTemplate(
+                name=name,
+                description=description,
+                category_id=category_id,
+                supplier_id=supplier_id,
+                tax_rate=float(tax_rate),
+                reorder_level=int(reorder_level),
+                sku_prefix=sku_prefix,
+                description_template=description_template
+            )
+            
+            db.session.add(template)
+            db.session.commit()
+            
+            flash(f'Template "{name}" created successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating template: {str(e)}', 'danger')
+            logging.error(f"Error creating product template: {str(e)}")
+        
+        return redirect(url_for('product_templates'))
+        
+    @app.route('/inventory/update-product-template', methods=['POST'])
+    @manager_required
+    def update_product_template():
+        """Update an existing product template."""
+        try:
+            template_id = request.form.get('template_id')
+            
+            template = ProductTemplate.query.get_or_404(template_id)
+            
+            template.name = request.form.get('name')
+            template.description = request.form.get('description')
+            template.category_id = request.form.get('category_id') or None
+            template.supplier_id = request.form.get('supplier_id') or None
+            template.tax_rate = float(request.form.get('tax_rate', 16.0))
+            template.reorder_level = int(request.form.get('reorder_level', 5))
+            template.sku_prefix = request.form.get('sku_prefix', '')
+            template.description_template = request.form.get('description_template', '')
+            
+            db.session.commit()
+            
+            flash(f'Template "{template.name}" updated successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating template: {str(e)}', 'danger')
+            logging.error(f"Error updating product template: {str(e)}")
+        
+        return redirect(url_for('product_templates'))
+        
+    @app.route('/inventory/delete-product-template', methods=['POST'])
+    @manager_required
+    def delete_product_template():
+        """Delete a product template."""
+        try:
+            template_id = request.form.get('template_id')
+            
+            template = ProductTemplate.query.get_or_404(template_id)
+            
+            # Check if any products are using this template
+            if Product.query.filter_by(template_id=template_id).count() > 0:
+                flash(f'Cannot delete template "{template.name}" because it is being used by products.', 'danger')
+                return redirect(url_for('product_templates'))
+                
+            db.session.delete(template)
+            db.session.commit()
+            
+            flash(f'Template "{template.name}" deleted successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error deleting template: {str(e)}', 'danger')
+            logging.error(f"Error deleting product template: {str(e)}")
+        
+        return redirect(url_for('product_templates'))
+        
+    @app.route('/api/product-templates/<int:template_id>', methods=['GET'])
+    @login_required
+    def get_product_template(template_id):
+        """Get product template data for AJAX requests."""
+        try:
+            template = ProductTemplate.query.get_or_404(template_id)
+            
+            # Get all categories and suppliers for the form
+            categories = Category.query.all()
+            suppliers = Supplier.query.all()
+            
+            return jsonify({
+                'id': template.id,
+                'name': template.name,
+                'description': template.description or '',
+                'category_id': template.category_id,
+                'supplier_id': template.supplier_id,
+                'tax_rate': template.tax_rate,
+                'reorder_level': template.reorder_level,
+                'sku_prefix': template.sku_prefix or '',
+                'description_template': template.description_template or '',
+                'categories': [{'id': c.id, 'name': c.name} for c in categories],
+                'suppliers': [{'id': s.id, 'name': s.name} for s in suppliers]
+            })
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    @app.route('/inventory/barcodes', methods=['GET'])
+    @login_required
+    def barcodes():
+        """Barcode generation and printing page."""
+        products = db.session.query(Product, Inventory)\
+            .join(Inventory, Product.id == Inventory.product_id)\
+            .filter(Inventory.store_id == session.get('store_id'))\
+            .all()
+            
+        return render_template('inventory/barcodes.html', products=products)
+        
+    @app.route('/inventory/download-product-template', methods=['GET'])
+    @login_required
+    def download_product_template():
+        """Download sample CSV template for product import."""
+        # Create a CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['Name', 'Description', 'SKU', 'Barcode', 'Selling Price', 'Cost Price', 'Tax Rate', 'Category', 'Quantity'])
+        
+        # Write sample data
+        writer.writerow(['Jogoo Maize Flour 2kg', 'Popular maize flour', 'SKU001', '5901234123457', '175.00', '145.00', '16', 'Groceries', '50'])
+        writer.writerow(['Mumias Sugar 1kg', 'Fine granulated sugar', 'SKU002', '5901234123458', '130.00', '110.00', '16', 'Groceries', '40'])
+        writer.writerow(['Dettol Soap 175g', 'Antibacterial soap', 'SKU003', '5901234123459', '90.00', '70.00', '16', 'Personal Care', '30'])
+        
+        # Go to the beginning of the stream
+        output.seek(0)
+        
+        # Create a response with the CSV
+        return send_file(
+            io.BytesIO(output.getvalue().encode()),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name='product_import_template.csv'
+        )
+        
+    @app.route('/inventory/save-label-template', methods=['POST'])
+    @login_required
+    def save_label_template():
+        """Save a label template."""
+        try:
+            template_name = request.form.get('template_name')
+            template_description = request.form.get('template_description', '')
+            template_config = request.form.get('template_config', '{}')
+            
+            # Validate JSON
+            json.loads(template_config)
+            
+            template = LabelTemplate(
+                name=template_name,
+                description=template_description,
+                config=template_config,
+                user_id=session.get('user_id')
+            )
+            
+            db.session.add(template)
+            db.session.commit()
+            
+            flash(f'Label template "{template_name}" saved successfully.', 'success')
+        except json.JSONDecodeError:
+            flash('Invalid template configuration.', 'danger')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error saving label template: {str(e)}', 'danger')
+            logging.error(f"Error saving label template: {str(e)}")
+        
+        return redirect(url_for('barcodes'))
+    
     # Error handlers
     @app.errorhandler(404)
     def page_not_found(e):
-        return render_template('404.html'), 404
+        return render_template('error/404.html'), 404
     
     @app.errorhandler(500)
     def server_error(e):
-        return render_template('500.html'), 500
+        return render_template('error/500.html'), 500
