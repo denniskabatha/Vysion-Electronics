@@ -39,7 +39,23 @@ def manager_required(view):
         # Check if user is manager or admin
         if session.get('role') not in [Role.ADMIN, Role.MANAGER]:
             flash('You do not have permission to access this page.', 'danger')
-            return redirect(url_for('dashboard'))
+            return redirect(url_for('pos'))
+            
+        return view(**kwargs)
+    return wrapped_view
+
+
+def not_cashier_required(view):
+    """Decorator to ensure user is not a cashier (employee)."""
+    @wraps(view)
+    def wrapped_view(**kwargs):
+        if not session.get('user_id'):
+            return redirect(url_for('login'))
+        
+        # Check if user is anything but cashier/employee
+        if session.get('role') == Role.EMPLOYEE:
+            flash('Employees do not have access to this area.', 'danger')
+            return redirect(url_for('pos'))
             
         return view(**kwargs)
     return wrapped_view

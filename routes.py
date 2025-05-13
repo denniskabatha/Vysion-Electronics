@@ -18,7 +18,7 @@ from models import (
     ProductTemplate, LabelTemplate
 )
 from auth import (
-    login_required, admin_required, manager_required,
+    login_required, admin_required, manager_required, not_cashier_required,
     register_user, authenticate_user, load_logged_in_user
 )
 from mpesa import initiate_stk_push, check_transaction_status
@@ -106,6 +106,7 @@ def register_routes(app):
     # Dashboard
     @app.route('/dashboard')
     @login_required
+    @not_cashier_required
     def dashboard():
         store_id = session.get('store_id')
         
