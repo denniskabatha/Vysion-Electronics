@@ -8,11 +8,48 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-lg-10">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-file-import me-2"></i> Bulk Add Products
+                    </h4>
+                    <a href="{{ url_for('download_product_template') }}" class="btn btn-sm btn-light">
+                        <i class="fas fa-download me-1"></i> Download Template
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p>Upload a CSV file with multiple products at once (supports thousands of products).</p>
+                    <form method="post" action="{{ url_for('add_product') }}" enctype="multipart/form-data">
+                        <input type="hidden" name="bulk_upload" value="1">
+                        <div class="row">
+                            <div class="col-md-9 mb-3">
+                                <input type="file" class="form-control" id="bulkFile" name="bulk_file" 
+                                       accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                                <div class="form-text">Upload a CSV file with product data (Name, SKU, Barcode, Selling Price, etc.)</div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <button type="submit" class="btn btn-primary w-100">
+                                    <i class="fas fa-cloud-upload-alt me-1"></i> Upload Products
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="headerRow" name="header_row" checked>
+                            <label class="form-check-label" for="headerRow">File contains header row</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="skipDuplicates" name="skip_duplicates" checked>
+                            <label class="form-check-label" for="skipDuplicates">Skip duplicate products</label>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
             <div class="card">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
                         <i class="fas fa-{% if edit_mode %}edit{% else %}plus{% endif %} me-2"></i>
-                        {% if edit_mode %}Edit Product: {{ product.name }}{% else %}Add New Product{% endif %}
+                        {% if edit_mode %}Edit Product: {{ product.name }}{% else %}Add Single Product{% endif %}
                     </h4>
                 </div>
                 <div class="card-body">

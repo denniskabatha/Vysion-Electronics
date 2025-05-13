@@ -418,51 +418,276 @@ def register_routes(app):
     @manager_required
     def add_product():
         if request.method == 'POST':
-            name = request.form.get('name')
-            description = request.form.get('description', '')
-            sku = request.form.get('sku')
-            barcode = request.form.get('barcode')
-            selling_price = request.form.get('selling_price')
-            cost_price = request.form.get('cost_price')
-            tax_rate = request.form.get('tax_rate', 0)
-            category_id = request.form.get('category_id')
-            supplier_id = request.form.get('supplier_id')
-            quantity = request.form.get('quantity', 0)
-            reorder_level = request.form.get('reorder_level', 5)
-            
-            try:
-                # Create product
-                product = Product(
-                    name=name,
-                    description=description,
-                    sku=sku,
-                    barcode=barcode,
-                    selling_price=float(selling_price),
-                    cost_price=float(cost_price),
-                    tax_rate=float(tax_rate),
-                    category_id=category_id if category_id else None,
-                    supplier_id=supplier_id if supplier_id else None
-                )
-                db.session.add(product)
-                db.session.flush()  # Get product ID without committing
+            # Check if this is a bulk upload
+            if 'bulk_upload' in request.form:
+                if 'bulk_file' not in request.files:
+                    flash('No file part', 'danger')
+                    return redirect(request.url)
+                    
+                file = request.files['bulk_file']
                 
-                # Create inventory entry for current store
-                inventory = Inventory(
-                    product_id=product.id,
-                    store_id=session.get('store_id'),
-                    quantity=int(quantity),
-                    reorder_level=int(reorder_level),
-                    last_restock_date=datetime.utcnow() if int(quantity) > 0 else None
-                )
-                db.session.add(inventory)
-                db.session.commit()
+                if file.filename == '':
+                    flash('No selected file', 'danger')
+                    return redirect(request.url)
+                    
+                if file and file.filename.endswith('.csv'):
+                    # Process the CSV file
+                    try:
+                        # Parse CSV
+                        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+                        csv_reader = csv.reader(stream)
+                        
+                        # Skip header row if indicated
+                        if request.form.get('header_row'):
+                            next(csv_reader)
+                            
+                        # Process each row
+                        products_added = 0
+                        errors = []
+                        skipped = 0
+                        
+                        # Cache data to minimize database queries
+                        categories_cache = {category.name.lower(): category.id for category in Category.query.all()}
+                        existing_skus = {product.sku for product in Product.query.with_entities(Product.sku).all() if product.sku}
+                        existing_barcodes = {product.barcode for product in Product.query.with_entities(Product.barcode).all() if product.barcode}
+                        
+                        # Process in batches for better performance
+                        batch_size = 100
+                        batch = []
+                        
+                        store_id = session.get('store_id')
+                        default_supplier = Supplier.query.first()
+                        default_supplier_id = default_supplier.id if default_supplier else None
+                        
+                        for row_num, row in enumerate(csv_reader, 1):
+                            try:
+                                # CSV format should be: Name, Description, SKU, Barcode, Selling Price, Cost Price, Tax Rate, Category, Quantity
+                                if len(row) < 5:  # At minimum we need name and selling price
+                                    errors.append(f"Row {row_num}: Not enough data. Need at least Name and Selling Price.")
+                                    continue
+                                    
+                                name = row[0].strip()
+                                description = row[1].strip() if len(row) > 1 and row[1] else f"Description for {name}"
+                                sku = row[2].strip() if len(row) > 2 and row[2] else f"SKU-{uuid.uuid4().hex[:8].upper()}"
+                                barcode = row[3].strip() if len(row) > 3 and row[3] else None
+                                
+                                try:
+                                    selling_price = float(row[4]) if len(row) > 4 and row[4] else 0
+                                except ValueError:
+                                    errors.append(f"Row {row_num}: Invalid selling price '{row[4]}'")
+                                    continue
+                                
+                                try:
+                                    cost_price = float(row[5]) if len(row) > 5 and row[5] else selling_price * 0.8  # Default 20% markup
+                                except ValueError:
+                                    errors.append(f"Row {row_num}: Invalid cost price '{row[5]}'")
+                                    continue
+                                
+                                try:
+                                    tax_rate = float(row[6]) if len(row) > 6 and row[6] else 16.0  # Default VAT rate
+                                except ValueError:
+                                    errors.append(f"Row {row_num}: Invalid tax rate '{row[6]}'")
+                                    continue
+                                
+                                category_name = row[7].strip() if len(row) > 7 and row[7] else None
+                                
+                                try:
+                                    quantity = int(row[8]) if len(row) > 8 and row[8] else 0
+                                except ValueError:
+                                    errors.append(f"Row {row_num}: Invalid quantity '{row[8]}'")
+                                    continue
+                                
+                                # Skip rows without a product name
+                                if not name:
+                                    skipped += 1
+                                    continue
+                                    
+                                # Check for duplicates if option is enabled
+                                if request.form.get('skip_duplicates', 'on') == 'on':
+                                    if sku and sku in existing_skus:
+                                        skipped += 1
+                                        continue
+                                    
+                                    if barcode and barcode in existing_barcodes:
+                                        skipped += 1
+                                        continue
+                                
+                                # Determine category ID
+                                category_id = None
+                                if category_name:
+                                    category_name_lower = category_name.lower()
+                                    if category_name_lower in categories_cache:
+                                        category_id = categories_cache[category_name_lower]
+                                    else:
+                                        # Create new category if it doesn't exist
+                                        new_category = Category(name=category_name)
+                                        db.session.add(new_category)
+                                        db.session.flush()
+                                        category_id = new_category.id
+                                        categories_cache[category_name_lower] = category_id
+                                
+                                # Generate barcode if not provided
+                                if not barcode:
+                                    # Generate a unique EAN-13 barcode
+                                    barcode = "590"  # Example prefix for Kenya
+                                    for _ in range(9):
+                                        barcode += str(random.randint(0, 9))
+                                    
+                                    # Calculate check digit
+                                    total = 0
+                                    for i, digit in enumerate(barcode):
+                                        total += int(digit) * (1 if i % 2 == 0 else 3)
+                                    check_digit = (10 - (total % 10)) % 10
+                                    barcode += str(check_digit)
+                                
+                                # Create product
+                                product = Product(
+                                    name=name,
+                                    description=description,
+                                    sku=sku,
+                                    barcode=barcode,
+                                    selling_price=selling_price,
+                                    cost_price=cost_price,
+                                    tax_rate=tax_rate,
+                                    category_id=category_id,
+                                    supplier_id=default_supplier_id,
+                                    is_active=True
+                                )
+                                
+                                # Add to batch for bulk insert
+                                batch.append(product)
+                                
+                                # Process in batches to improve performance
+                                if len(batch) >= batch_size:
+                                    db.session.add_all(batch)
+                                    db.session.flush()  # Get IDs without committing
+                                    
+                                    # Create inventory entries for each product in batch
+                                    for prod in batch:
+                                        inventory = Inventory(
+                                            product_id=prod.id,
+                                            store_id=store_id,
+                                            quantity=quantity,
+                                            reorder_level=5,
+                                            last_restock_date=datetime.utcnow() if quantity > 0 else None
+                                        )
+                                        db.session.add(inventory)
+                                        
+                                        # Update tracking
+                                        existing_skus.add(prod.sku)
+                                        existing_barcodes.add(prod.barcode)
+                                    
+                                    products_added += len(batch)
+                                    batch = []
+                                
+                            except Exception as e:
+                                errors.append(f"Row {row_num}: {str(e)}")
+                                continue
+                        
+                        # Process any remaining products in the last batch
+                        if batch:
+                            db.session.add_all(batch)
+                            db.session.flush()
+                            
+                            # Create inventory entries for remaining products
+                            for prod in batch:
+                                inventory = Inventory(
+                                    product_id=prod.id,
+                                    store_id=store_id,
+                                    quantity=quantity,
+                                    reorder_level=5,
+                                    last_restock_date=datetime.utcnow() if quantity > 0 else None
+                                )
+                                db.session.add(inventory)
+                            
+                            products_added += len(batch)
+                        
+                        # Either commit all or roll back
+                        if products_added > 0:
+                            db.session.commit()
+                            
+                            # Create detailed success message
+                            success_msg = f'Successfully imported {products_added} products'
+                            details = []
+                            
+                            if skipped > 0:
+                                details.append(f"{skipped} skipped")
+                            if len(errors) > 0:
+                                details.append(f"{len(errors)} errors")
+                                
+                            if details:
+                                success_msg += f" ({', '.join(details)})"
+                            
+                            flash(success_msg, 'success')
+                        else:
+                            db.session.rollback()
+                            flash('No products were imported. Please check your file and try again.', 'warning')
+                        
+                        # Report errors with row numbers for easier reference
+                        if errors:
+                            for error in errors[:5]:  # Show first 5 errors
+                                flash(error, 'warning')
+                            if len(errors) > 5:
+                                flash(f'... and {len(errors) - 5} more errors. Check the logs for details.', 'warning')
+                                for error in errors:
+                                    logging.error(error)
+                                    
+                        return redirect(url_for('inventory'))
+                    except Exception as e:
+                        db.session.rollback()
+                        flash(f'Error importing products: {str(e)}', 'danger')
+                        logging.error(f"Error importing products: {str(e)}")
+                        return redirect(request.url)
+                else:
+                    flash('File type not supported. Please upload a CSV file.', 'danger')
+                    return redirect(request.url)
+            else:
+                # Regular single product addition
+                name = request.form.get('name')
+                description = request.form.get('description', '')
+                sku = request.form.get('sku')
+                barcode = request.form.get('barcode')
+                selling_price = request.form.get('selling_price')
+                cost_price = request.form.get('cost_price')
+                tax_rate = request.form.get('tax_rate', 0)
+                category_id = request.form.get('category_id')
+                supplier_id = request.form.get('supplier_id')
+                quantity = request.form.get('quantity', 0)
+                reorder_level = request.form.get('reorder_level', 5)
                 
-                flash(f'Product {name} added successfully!', 'success')
-                return redirect(url_for('inventory'))
-                
-            except Exception as e:
-                db.session.rollback()
-                flash(f'Error adding product: {str(e)}', 'danger')
+                try:
+                    # Create product
+                    product = Product(
+                        name=name,
+                        description=description,
+                        sku=sku,
+                        barcode=barcode,
+                        selling_price=float(selling_price),
+                        cost_price=float(cost_price),
+                        tax_rate=float(tax_rate),
+                        category_id=category_id if category_id else None,
+                        supplier_id=supplier_id if supplier_id else None
+                    )
+                    db.session.add(product)
+                    db.session.flush()  # Get product ID without committing
+                    
+                    # Create inventory entry for current store
+                    inventory = Inventory(
+                        product_id=product.id,
+                        store_id=session.get('store_id'),
+                        quantity=int(quantity),
+                        reorder_level=int(reorder_level),
+                        last_restock_date=datetime.utcnow() if int(quantity) > 0 else None
+                    )
+                    db.session.add(inventory)
+                    db.session.commit()
+                    
+                    flash(f'Product {name} added successfully!', 'success')
+                    return redirect(url_for('inventory'))
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error adding product: {str(e)}', 'danger')
         
         categories = Category.query.all()
         suppliers = Supplier.query.all()
