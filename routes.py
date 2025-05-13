@@ -56,7 +56,11 @@ def register_routes(app):
                 user.last_login = datetime.utcnow()
                 db.session.commit()
                 
-                return redirect(url_for('dashboard'))
+                # If user is a cashier/employee, redirect to POS; otherwise to dashboard
+                if user.role.name == Role.EMPLOYEE:
+                    return redirect(url_for('pos'))
+                else:
+                    return redirect(url_for('dashboard'))
             
             flash('Invalid username or password', 'danger')
         
@@ -396,6 +400,7 @@ def register_routes(app):
     # Inventory routes
     @app.route('/inventory')
     @login_required
+    @not_cashier_required
     def inventory():
         store_id = session.get('store_id')
         
@@ -578,6 +583,7 @@ def register_routes(app):
     # Report routes
     @app.route('/reports/sales')
     @login_required
+    @not_cashier_required
     def sales_report():
         store_id = session.get('store_id')
         
@@ -627,6 +633,7 @@ def register_routes(app):
     
     @app.route('/reports/inventory')
     @login_required
+    @not_cashier_required
     def inventory_report():
         store_id = session.get('store_id')
         
