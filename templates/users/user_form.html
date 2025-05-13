@@ -1,7 +1,13 @@
 {% extends 'base.html' %}
 
 {% block title %}
-    {% if edit_mode %}Edit User{% else %}Add New User{% endif %} - Kenyan Cloud POS
+    {% if edit_mode %}
+        Edit User
+    {% elif employee_mode %}
+        Add Employee
+    {% else %}
+        Add New User
+    {% endif %} - Kenyan Cloud POS
 {% endblock %}
 
 {% block content %}
@@ -9,10 +15,16 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header {% if employee_mode %}bg-success{% else %}bg-primary{% endif %} text-white">
                     <h4 class="mb-0">
-                        <i class="fas fa-{% if edit_mode %}edit{% else %}user-plus{% endif %} me-2"></i>
-                        {% if edit_mode %}Edit User: {{ user.username }}{% else %}Add New User{% endif %}
+                        <i class="fas fa-{% if edit_mode %}edit{% elif employee_mode %}user-tag{% else %}user-plus{% endif %} me-2"></i>
+                        {% if edit_mode %}
+                            Edit User: {{ user.username }}
+                        {% elif employee_mode %}
+                            Add Employee
+                        {% else %}
+                            Add New User
+                        {% endif %}
                     </h4>
                 </div>
                 <div class="card-body">
@@ -49,14 +61,22 @@
                             
                             <div class="col-md-6 mb-3">
                                 <label for="role_id" class="form-label">Role <span class="text-danger">*</span></label>
-                                <select class="form-select" id="role_id" name="role_id" required>
+                                <select class="form-select" id="role_id" name="role_id" required {% if employee_mode %}readonly{% endif %}>
                                     <option value="" selected disabled>-- Select Role --</option>
                                     {% for role in roles %}
-                                    <option value="{{ role.id }}" {% if user and user.role_id == role.id %}selected{% endif %}>
+                                    <option value="{{ role.id }}" 
+                                        {% if user and user.role_id == role.id %}
+                                            selected
+                                        {% elif selected_role_id and role.id == selected_role_id %}
+                                            selected
+                                        {% endif %}>
                                         {{ role.name | title }} - {{ role.description }}
                                     </option>
                                     {% endfor %}
                                 </select>
+                                {% if employee_mode %}
+                                <div class="form-text">Role is pre-selected as Employee for this user type</div>
+                                {% endif %}
                             </div>
                             
                             {% if edit_mode %}
@@ -112,9 +132,15 @@
                             <a href="{{ url_for('users') }}" class="btn btn-secondary">
                                 <i class="fas fa-arrow-left me-1"></i> Back to Users
                             </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-{% if edit_mode %}save{% else %}user-plus{% endif %} me-1"></i> 
-                                {% if edit_mode %}Update User{% else %}Add User{% endif %}
+                            <button type="submit" class="btn btn-{% if employee_mode %}success{% else %}primary{% endif %}">
+                                <i class="fas fa-{% if edit_mode %}save{% elif employee_mode %}user-tag{% else %}user-plus{% endif %} me-1"></i> 
+                                {% if edit_mode %}
+                                    Update User
+                                {% elif employee_mode %}
+                                    Add Employee
+                                {% else %}
+                                    Add User
+                                {% endif %}
                             </button>
                         </div>
                     </form>

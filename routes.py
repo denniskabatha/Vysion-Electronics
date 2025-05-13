@@ -676,6 +676,9 @@ def register_routes(app):
     @app.route('/users/add', methods=['GET', 'POST'])
     @admin_required
     def add_user():
+        # Check if employee role is specified in query parameters
+        employee_role = request.args.get('role') == 'employee'
+        
         if request.method == 'POST':
             username = request.form.get('username')
             email = request.form.get('email')
@@ -707,7 +710,23 @@ def register_routes(app):
         
         roles = Role.query.all()
         stores = Store.query.all()
-        return render_template('users/user_form.html', roles=roles, stores=stores)
+        
+        # If creating an employee, preselect the employee role
+        selected_role_id = None
+        if employee_role:
+            # Find employee role ID
+            employee_role_obj = Role.query.filter_by(name=Role.EMPLOYEE).first()
+            if employee_role_obj:
+                selected_role_id = employee_role_obj.id
+        
+        return render_template(
+            'users/user_form.html', 
+            roles=roles, 
+            stores=stores, 
+            employee_mode=employee_role,
+            selected_role_id=selected_role_id,
+            title="Add Employee" if employee_role else "Add New User"
+        )
     
     @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
     @admin_required
