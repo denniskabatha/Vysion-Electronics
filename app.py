@@ -26,11 +26,12 @@ app.secret_key = os.environ.get("SESSION_SECRET", "kenya_pos_default_secret_key"
 # Configure proxy fix middleware for proper URL generation
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database connection
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///kenyan_pos.db")
+# Configure database connection - using SQLite
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kenyan_pos.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# SQLite-specific options
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
+    "connect_args": {"check_same_thread": False},
     "pool_pre_ping": True,
 }
 
