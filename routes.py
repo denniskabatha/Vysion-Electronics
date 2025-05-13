@@ -526,12 +526,14 @@ def register_routes(app):
     # Customer routes
     @app.route('/customers')
     @login_required
+    @not_cashier_required
     def customers():
         customers = Customer.query.all()
         return render_template('customers/index.html', customers=customers)
     
     @app.route('/customers/add', methods=['GET', 'POST'])
     @login_required
+    @not_cashier_required
     def add_customer():
         if request.method == 'POST':
             name = request.form.get('name')
@@ -560,6 +562,7 @@ def register_routes(app):
     
     @app.route('/customers/edit/<int:customer_id>', methods=['GET', 'POST'])
     @login_required
+    @not_cashier_required
     def edit_customer(customer_id):
         customer = Customer.query.get_or_404(customer_id)
         
@@ -777,6 +780,8 @@ def register_routes(app):
     
     # Settings and store management
     @app.route('/settings', methods=['GET', 'POST'])
+    @login_required
+    @not_cashier_required
     @manager_required
     def settings():
         store_id = session.get('store_id')
