@@ -668,6 +668,42 @@ def register_routes(app):
         )
         return render_template('users/index.html', users=users)
     
+    @app.route('/users/add', methods=['GET', 'POST'])
+    @admin_required
+    def add_user():
+        if request.method == 'POST':
+            username = request.form.get('username')
+            email = request.form.get('email')
+            password = request.form.get('password')
+            first_name = request.form.get('first_name')
+            last_name = request.form.get('last_name')
+            phone = request.form.get('phone')
+            role_id = request.form.get('role_id')
+            store_id = request.form.get('store_id')
+            
+            error = None
+            
+            if not username or not email or not password or not role_id or not store_id:
+                error = 'All fields are required.'
+            elif User.query.filter_by(username=username).first():
+                error = f'User {username} is already registered.'
+            elif User.query.filter_by(email=email).first():
+                error = f'Email {email} is already registered.'
+            
+            if error is None:
+                try:
+                    user = register_user(username, email, password, first_name, last_name, phone, role_id, store_id)
+                    flash(f'User {username} created successfully!', 'success')
+                    return redirect(url_for('users'))
+                except Exception as e:
+                    error = str(e)
+            
+            flash(error, 'danger')
+        
+        roles = Role.query.all()
+        stores = Store.query.all()
+        return render_template('users/user_form.html', roles=roles, stores=stores)
+    
     @app.route('/users/edit/<int:user_id>', methods=['GET', 'POST'])
     @admin_required
     def edit_user(user_id):
@@ -795,8 +831,9 @@ def register_routes(app):
             admin_role = Role(name=Role.ADMIN, description='System Administrator')
             manager_role = Role(name=Role.MANAGER, description='Store Manager')
             cashier_role = Role(name=Role.CASHIER, description='Sales Cashier')
+            employee_role = Role(name=Role.EMPLOYEE, description='Store Employee')
             
-            db.session.add_all([admin_role, manager_role, cashier_role])
+            db.session.add_all([admin_role, manager_role, cashier_role, employee_role])
             db.session.flush()
             
             # Create default store

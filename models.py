@@ -15,6 +15,7 @@ class Role(db.Model):
     ADMIN = "admin"
     MANAGER = "manager"
     CASHIER = "cashier"
+    EMPLOYEE = "employee"
     
     def __repr__(self):
         return f"<Role {self.name}>"
