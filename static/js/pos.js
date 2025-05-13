@@ -522,8 +522,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Close modal
                     checkoutModal.hide();
                     
-                    // Show receipt or success message
-                    showReceiptModal(result.reference, selectedPaymentMethod, cart.totalAmount);
+                    // Show receipt or success message with cashier name
+                    showReceiptModal(
+                        result.reference, 
+                        selectedPaymentMethod, 
+                        cart.totalAmount,
+                        result.cashier_name
+                    );
                     
                     // Clear cart
                     clearCart();
@@ -725,7 +730,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Show receipt modal
-    function showReceiptModal(reference, paymentMethod, amount) {
+    function showReceiptModal(reference, paymentMethod, amount, cashierName) {
         const modal = document.createElement('div');
         modal.innerHTML = `
             <div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
@@ -745,6 +750,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <p><strong>Payment Method:</strong> ${paymentMethod.toUpperCase()}</p>
                                 <p><strong>Amount:</strong> ${formatCurrency(amount)}</p>
                                 <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                                <p><strong>Served By:</strong> ${cashierName || 'Unknown'}</p>
                             </div>
                         </div>
                         <div class="modal-footer">

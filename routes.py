@@ -251,12 +251,17 @@ def register_routes(app):
             # Only commit if non-M-Pesa or if M-Pesa is just saved as pending
             db.session.commit()
             
+            # Get the cashier's name for the receipt
+            cashier = User.query.get(session.get('user_id'))
+            cashier_name = cashier.full_name if cashier else "Unknown"
+            
             return jsonify({
                 'success': True,
                 'sale_id': sale.id,
                 'reference': sale.reference,
                 'payment_success': payment_success,
-                'payment_reference': payment_reference
+                'payment_reference': payment_reference,
+                'cashier_name': cashier_name
             })
             
         except Exception as e:
