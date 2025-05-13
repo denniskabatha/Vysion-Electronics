@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+
+{% block title %}User Management - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-sm-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0 mb-3 mb-sm-0"><i class="fas fa-user-cog me-2"></i>User Management</h1>
+        
+        <a href="{{ url_for('register') }}" class="btn btn-primary">
+            <i class="fas fa-user-plus me-1"></i> Add New User
+        </a>
+    </div>
+    
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Full Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Role</th>
+                            <th>Store</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if users %}
+                            {% for user, role, store in users %}
+                            <tr>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.full_name }}</td>
+                                <td>{{ user.email }}</td>
+                                <td>{{ user.phone }}</td>
+                                <td>
+                                    <span class="badge bg-{% if role.name == 'admin' %}danger{% elif role.name == 'manager' %}warning text-dark{% else %}info{% endif %}">
+                                        {{ role.name | title }}
+                                    </span>
+                                </td>
+                                <td>{{ store.name }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-{% if user.is_active %}success{% else %}secondary{% endif %}">
+                                        {{ 'Active' if user.is_active else 'Inactive' }}
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-info view-user-btn" data-id="{{ user.id }}">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        {% if user.id != session.get('user_id') %}
+                                        <button type="button" class="btn btn-sm btn-outline-{{ 'danger' if user.is_active else 'success' }} toggle-status-btn"
+                                                data-id="{{ user.id }}" 
+                                                data-status="{{ user.is_active }}"
+                                                data-bs-toggle="tooltip" 
+                                                title="{{ 'Deactivate' if user.is_active else 'Activate' }} User">
+                                            <i class="fas fa-{{ 'ban' if user.is_active else 'check-circle' }}"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">No users found</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Details Modal -->
+<div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalLabel">User Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <div class="text-center mb-3">
+                            <i class="fas fa-user-circle fa-5x text-primary"></i>
+                        </div>
+                        <h5 class="text-center mb-3" id="modal-user-name">User Name</h5>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <p><strong>Username:</strong> <span id="modal-username"></span></p>
+                        <p><strong>Email:</strong> <span id="modal-email"></span></p>
+                        <p><strong>Phone:</strong> <span id="modal-phone"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p><strong>Role:</strong> <span id="modal-role"></span></p>
+                        <p><strong>Store:</strong> <span id="modal-store"></span></p>
+                        <p><strong>Status:</strong> <span id="modal-status"></span></p>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <hr>
+                        <p><strong>Last Login:</strong> <span id="modal-last-login"></span></p>
+                        <p><strong>Account Created:</strong> <span id="modal-created-at"></span></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-primary" id="modal-edit-link">
+                    <i class="fas fa-edit me-1"></i> Edit User
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // View user details
+        const viewButtons = document.querySelectorAll('.view-user-btn');
+        const userModal = new bootstrap.Modal(document.getElementById('userModal'));
+        
+        viewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-id');
+                const row = this.closest('tr');
+                
+                // Fill modal with data from the row
+                document.getElementById('modal-username').textContent = row.cells[0].textContent;
+                document.getElementById('modal-user-name').textContent = row.cells[1].textContent;
+                document.getElementById('modal-email').textContent = row.cells[2].textContent;
+                document.getElementById('modal-phone').textContent = row.cells[3].textContent;
+                document.getElementById('modal-role').textContent = row.cells[4].textContent.trim();
+                document.getElementById('modal-store').textContent = row.cells[5].textContent;
+                document.getElementById('modal-status').textContent = row.cells[6].textContent.trim();
+                
+                // Set the edit link
+                document.getElementById('modal-edit-link').href = `/users/edit/${userId}`;
+                
+                // Last login and created at would come from the server in a real implementation
+                document.getElementById('modal-last-login').textContent = 'N/A';
+                document.getElementById('modal-created-at').textContent = 'N/A';
+                
+                // Show modal
+                userModal.show();
+            });
+        });
+        
+        // Toggle user status
+        const toggleButtons = document.querySelectorAll('.toggle-status-btn');
+        
+        toggleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-id');
+                const isActive = this.getAttribute('data-status') === 'True';
+                const newStatus = !isActive;
+                
+                if (confirm(`Are you sure you want to ${isActive ? 'deactivate' : 'activate'} this user?`)) {
+                    // In a real implementation, this would submit to the server
+                    alert(`User status changed to ${newStatus ? 'active' : 'inactive'}`);
+                    
+                    // Update UI to reflect the change
+                    const statusCell = this.closest('tr').cells[6].querySelector('.badge');
+                    if (newStatus) {
+                        statusCell.className = 'badge bg-success';
+                        statusCell.textContent = 'Active';
+                        this.className = 'btn btn-sm btn-outline-danger toggle-status-btn';
+                        this.innerHTML = '<i class="fas fa-ban"></i>';
+                        this.setAttribute('title', 'Deactivate User');
+                    } else {
+                        statusCell.className = 'badge bg-secondary';
+                        statusCell.textContent = 'Inactive';
+                        this.className = 'btn btn-sm btn-outline-success toggle-status-btn';
+                        this.innerHTML = '<i class="fas fa-check-circle"></i>';
+                        this.setAttribute('title', 'Activate User');
+                    }
+                    
+                    this.setAttribute('data-status', newStatus.toString());
+                }
+            });
+        });
+        
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(tooltipTriggerEl => {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

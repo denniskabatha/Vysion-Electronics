@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+
+{% block title %}Customers - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-sm-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0 mb-3 mb-sm-0"><i class="fas fa-users me-2"></i>Customers</h1>
+        
+        <a href="{{ url_for('add_customer') }}" class="btn btn-primary">
+            <i class="fas fa-user-plus me-1"></i> Add New Customer
+        </a>
+    </div>
+    
+    <!-- Filter and Search -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="customer-search" placeholder="Search by name, phone or email...">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-sort"></i></span>
+                        <select class="form-select" id="customer-sort">
+                            <option value="name-asc">Name (A-Z)</option>
+                            <option value="name-desc">Name (Z-A)</option>
+                            <option value="created-desc">Newest First</option>
+                            <option value="created-asc">Oldest First</option>
+                            <option value="loyalty-desc">Loyalty Points (High to Low)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Customers Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover" id="customers-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Email</th>
+                            <th>Address</th>
+                            <th class="text-center">Loyalty Points</th>
+                            <th class="text-center">Total Sales</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if customers %}
+                            {% for customer in customers %}
+                            <tr>
+                                <td>{{ customer.name }}</td>
+                                <td>{{ customer.phone }}</td>
+                                <td>{{ customer.email }}</td>
+                                <td>{{ customer.address }}</td>
+                                <td class="text-center">
+                                    <span class="badge bg-info">{{ customer.loyalty_points }}</span>
+                                </td>
+                                <td class="text-center">{{ customer.sales|length }}</td>
+                                <td class="text-end">
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('edit_customer', customer_id=customer.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline-info view-customer-btn" data-id="{{ customer.id }}">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="New Sale">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">No customers found</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted">Total Customers: {{ customers|length }}</span>
+                </div>
+                <div>
+                    <button class="btn btn-outline-primary me-2">
+                        <i class="fas fa-file-export me-1"></i> Export
+                    </button>
+                    <button class="btn btn-outline-success">
+                        <i class="fas fa-user-tag me-1"></i> Bulk SMS
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Customer Details Modal (will be shown when view button is clicked) -->
+<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="customerModalLabel">Customer Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Personal Information</h6>
+                        <p><strong>Name:</strong> <span id="modal-customer-name"></span></p>
+                        <p><strong>Phone:</strong> <span id="modal-customer-phone"></span></p>
+                        <p><strong>Email:</strong> <span id="modal-customer-email"></span></p>
+                        <p><strong>Address:</strong> <span id="modal-customer-address"></span></p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Account Information</h6>
+                        <p><strong>Loyalty Points:</strong> <span id="modal-customer-loyalty" class="badge bg-info"></span></p>
+                        <p><strong>Member Since:</strong> <span id="modal-customer-created"></span></p>
+                        <p><strong>Last Purchase:</strong> <span id="modal-customer-last-purchase"></span></p>
+                    </div>
+                </div>
+                
+                <h6 class="mt-4 mb-3">Recent Purchases</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Reference</th>
+                                <th>Items</th>
+                                <th class="text-end">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-customer-purchases">
+                            <tr>
+                                <td colspan="4" class="text-center">No purchases found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-primary" id="modal-edit-link">
+                    <i class="fas fa-edit me-1"></i> Edit Customer
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('customer-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const searchTerm = this.value.toLowerCase();
+                const rows = document.querySelectorAll('#customers-table tbody tr');
+                
+                rows.forEach(row => {
+                    const name = row.cells[0].textContent.toLowerCase();
+                    const phone = row.cells[1].textContent.toLowerCase();
+                    const email = row.cells[2].textContent.toLowerCase();
+                    
+                    if (name.includes(searchTerm) || phone.includes(searchTerm) || email.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+        
+        // View customer details
+        const viewButtons = document.querySelectorAll('.view-customer-btn');
+        const customerModal = new bootstrap.Modal(document.getElementById('customerModal'));
+        
+        viewButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const customerId = this.getAttribute('data-id');
+                
+                // In a real implementation, we would fetch customer details via AJAX
+                // For this demo, we'll just populate with dummy data
+                const row = this.closest('tr');
+                document.getElementById('modal-customer-name').textContent = row.cells[0].textContent;
+                document.getElementById('modal-customer-phone').textContent = row.cells[1].textContent;
+                document.getElementById('modal-customer-email').textContent = row.cells[2].textContent;
+                document.getElementById('modal-customer-address').textContent = row.cells[3].textContent;
+                document.getElementById('modal-customer-loyalty').textContent = row.cells[4].textContent.trim();
+                document.getElementById('modal-customer-created').textContent = '01/01/2023';
+                document.getElementById('modal-customer-last-purchase').textContent = '15/06/2023';
+                
+                // Set the edit link
+                document.getElementById('modal-edit-link').href = `/customers/edit/${customerId}`;
+                
+                // Show modal
+                customerModal.show();
+            });
+        });
+        
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(tooltipTriggerEl => {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

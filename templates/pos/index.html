@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}Point of Sale - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Point of Sale</h1>
+        </div>
+        <div class="col-md-4">
+            <div class="d-flex justify-content-end">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-barcode"></i></span>
+                    <input type="text" class="form-control" id="barcode-input" placeholder="Scan barcode">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Product selection side (left) -->
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                                <input type="text" class="form-control" id="product-search" placeholder="Search products...">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                                <select class="form-select" id="category-filter">
+                                    <option value="">All Categories</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-body p-3 pos-product-grid">
+                    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3" id="product-results">
+                        {% if products %}
+                            {% for product, inventory in products %}
+                            <div class="col">
+                                <div class="card h-100 product-card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">{{ product.name }}</h6>
+                                        <p class="card-text">
+                                            KES {{ "{:,.2f}".format(product.selling_price) }}<br>
+                                            <small class="{% if inventory.quantity <= 0 %}text-danger{% elif inventory.quantity <= inventory.reorder_level %}text-warning{% else %}text-success{% endif %}">
+                                                Stock: {{ inventory.quantity }}
+                                            </small>
+                                        </p>
+                                    </div>
+                                    <div class="card-footer bg-transparent border-top-0">
+                                        <button class="btn btn-sm btn-primary add-to-cart" 
+                                                data-id="{{ product.id }}"
+                                                {% if inventory.quantity <= 0 %}disabled{% endif %}>
+                                            {% if inventory.quantity > 0 %}Add to Cart{% else %}Out of Stock{% endif %}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="col-12 text-center py-5">
+                                <p>No products available</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Cart side (right) -->
+        <div class="col-lg-4">
+            <div class="card sticky-top" style="top: 20px;">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-shopping-basket me-2"></i>Current Sale</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="pos-cart">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Price</th>
+                                    <th>Qty</th>
+                                    <th>Tax</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="cart-items">
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">Cart is empty</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span id="cart-subtotal">KES 0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax:</span>
+                        <span id="cart-tax">KES 0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Discount:</span>
+                        <span id="cart-discount">KES 0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between fw-bold mb-3">
+                        <span>Total:</span>
+                        <span id="cart-total">KES 0.00</span>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="customer-select" class="form-label">Customer (Optional)</label>
+                        <select class="form-select" id="customer-select">
+                            <option value="">Walk-in Customer</option>
+                            {% for customer in customers %}
+                            <option value="{{ customer.id }}">{{ customer.name }} - {{ customer.phone }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary btn-lg" id="checkout-btn" disabled>
+                            <i class="fas fa-cash-register me-2"></i>Checkout
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="clear-cart-btn">
+                            <i class="fas fa-trash me-2"></i>Clear Cart
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pos.js') }}"></script>
+{% endblock %}

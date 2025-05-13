@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory Management - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-sm-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0 mb-3 mb-sm-0"><i class="fas fa-boxes me-2"></i>Inventory Management</h1>
+        
+        {% if session.get('role') in ['admin', 'manager'] %}
+        <a href="{{ url_for('add_product') }}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Add New Product
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Filters and Search -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="inventory-search" placeholder="Search products...">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-filter"></i></span>
+                        <select class="form-select" id="inventory-filter">
+                            <option value="all">All Products</option>
+                            <option value="low-stock">Low Stock</option>
+                            <option value="out-of-stock">Out of Stock</option>
+                            {% for category in categories %}
+                            <option value="{{ category.name }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="fas fa-sort"></i></span>
+                        <select class="form-select" id="inventory-sort">
+                            <option value="name-asc">Name (A-Z)</option>
+                            <option value="name-desc">Name (Z-A)</option>
+                            <option value="quantity-asc">Quantity (Low to High)</option>
+                            <option value="quantity-desc">Quantity (High to Low)</option>
+                            <option value="price-asc">Price (Low to High)</option>
+                            <option value="price-desc">Price (High to Low)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Table -->
+    <div class="card">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover" id="inventory-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>SKU/Barcode</th>
+                            <th>Category</th>
+                            <th class="text-center">In Stock</th>
+                            <th class="text-end">Price</th>
+                            <th class="text-center">Status</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if inventory_items %}
+                            {% for product, inventory, category in inventory_items %}
+                            <tr data-product-id="{{ product.id }}" data-reorder-level="{{ inventory.reorder_level }}" class="{% if inventory.quantity <= 0 %}table-danger{% elif inventory.quantity <= inventory.reorder_level %}table-warning{% endif %}">
+                                <td class="product-name">{{ product.name }}</td>
+                                <td>
+                                    {% if product.sku %}<div>SKU: {{ product.sku }}</div>{% endif %}
+                                    {% if product.barcode %}<div>Barcode: {{ product.barcode }}</div>{% endif %}
+                                </td>
+                                <td class="product-category">{{ category.name if category else 'Uncategorized' }}</td>
+                                <td class="text-center product-quantity">{{ inventory.quantity }}</td>
+                                <td class="text-end product-price" data-price="{{ product.selling_price }}">
+                                    KES {{ "{:,.2f}".format(product.selling_price) }}
+                                </td>
+                                <td class="text-center">
+                                    {% if inventory.quantity <= 0 %}
+                                    <span class="badge bg-danger">Out of Stock</span>
+                                    {% elif inventory.quantity <= inventory.reorder_level %}
+                                    <span class="badge bg-warning text-dark">Low Stock</span>
+                                    {% else %}
+                                    <span class="badge bg-success">In Stock</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group">
+                                        {% if session.get('role') in ['admin', 'manager'] %}
+                                        <a href="{{ url_for('edit_product', product_id=product.id) }}" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-outline-secondary adjust-stock-btn" 
+                                                data-id="{{ product.id }}" 
+                                                data-name="{{ product.name }}" 
+                                                data-stock="{{ inventory.quantity }}"
+                                                data-bs-toggle="tooltip" 
+                                                title="Adjust Stock">
+                                            <i class="fas fa-layer-group"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-info" 
+                                                data-bs-toggle="tooltip" 
+                                                title="View Details">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center py-4">No products found in inventory</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <span class="text-muted">Total Products: {{ inventory_items|length }}</span>
+                </div>
+                <div>
+                    <button class="btn btn-outline-primary me-2">
+                        <i class="fas fa-file-export me-1"></i> Export
+                    </button>
+                    <button class="btn btn-outline-success">
+                        <i class="fas fa-print me-1"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/inventory.js') }}"></script>
+{% endblock %}

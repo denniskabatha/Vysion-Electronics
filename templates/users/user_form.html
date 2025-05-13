@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if edit_mode %}Edit User{% else %}Add New User{% endif %} - Kenyan Cloud POS
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-{% if edit_mode %}edit{% else %}user-plus{% endif %} me-2"></i>
+                        {% if edit_mode %}Edit User: {{ user.username }}{% else %}Add New User{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% if edit_mode %}{{ url_for('edit_user', user_id=user.id) }}{% else %}{{ url_for('register') }}{% endif %}">
+                        <!-- Account Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Account Information</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       value="{% if user %}{{ user.username }}{% endif %}" required
+                                       {% if edit_mode %}readonly{% endif %}>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{% if user %}{{ user.email }}{% endif %}" required>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="password" class="form-label">
+                                    Password {% if not edit_mode %}<span class="text-danger">*</span>{% endif %}
+                                </label>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       {% if not edit_mode %}required{% endif %}>
+                                {% if edit_mode %}
+                                <div class="form-text">Leave blank to keep current password</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="role_id" class="form-label">Role <span class="text-danger">*</span></label>
+                                <select class="form-select" id="role_id" name="role_id" required>
+                                    <option value="" selected disabled>-- Select Role --</option>
+                                    {% for role in roles %}
+                                    <option value="{{ role.id }}" {% if user and user.role_id == role.id %}selected{% endif %}>
+                                        {{ role.name | title }} - {{ role.description }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            
+                            {% if edit_mode %}
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="is_active" name="is_active" 
+                                           {% if user and user.is_active %}checked{% endif %}>
+                                    <label class="form-check-label" for="is_active">Active Account</label>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Personal Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Personal Information</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="first_name" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name" 
+                                       value="{% if user %}{{ user.first_name }}{% endif %}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name" 
+                                       value="{% if user %}{{ user.last_name }}{% endif %}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" 
+                                       value="{% if user %}{{ user.phone }}{% endif %}"
+                                       placeholder="e.g. 0712345678">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="store_id" class="form-label">Assigned Store <span class="text-danger">*</span></label>
+                                <select class="form-select" id="store_id" name="store_id" required>
+                                    <option value="" selected disabled>-- Select Store --</option>
+                                    {% for store in stores %}
+                                    <option value="{{ store.id }}" {% if user and user.store_id == store.id %}selected{% endif %}>
+                                        {{ store.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Users
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-{% if edit_mode %}save{% else %}user-plus{% endif %} me-1"></i> 
+                                {% if edit_mode %}Update User{% else %}Add User{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

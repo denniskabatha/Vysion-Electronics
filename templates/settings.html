@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %}Store Settings - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-cog me-2"></i>Store Settings</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('settings') }}">
+                        <!-- Store Information -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Store Information</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Store Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{{ store.name }}" required>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="location" class="form-label">Location</label>
+                                <input type="text" class="form-control" id="location" name="location" 
+                                       value="{{ store.location }}">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" 
+                                       value="{{ store.phone }}" placeholder="e.g. +254712345678">
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{{ store.email }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Receipt Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Receipt Settings</h5>
+                            </div>
+                            
+                            <div class="col-md-12 mb-3">
+                                <label for="receipt_header" class="form-label">Receipt Header</label>
+                                <textarea class="form-control" id="receipt_header" name="receipt_header" rows="2">Thank you for shopping with us!</textarea>
+                                <div class="form-text">Text to appear at the top of receipts</div>
+                            </div>
+                            
+                            <div class="col-md-12 mb-3">
+                                <label for="receipt_footer" class="form-label">Receipt Footer</label>
+                                <textarea class="form-control" id="receipt_footer" name="receipt_footer" rows="2">Please come again!</textarea>
+                                <div class="form-text">Text to appear at the bottom of receipts</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="show_tax" name="show_tax" checked>
+                                    <label class="form-check-label" for="show_tax">Show Tax Details on Receipt</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="email_receipt" name="email_receipt">
+                                    <label class="form-check-label" for="email_receipt">Enable Email Receipts</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- M-Pesa Integration Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">M-Pesa Integration</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="mpesa_shortcode" class="form-label">M-Pesa Till/Paybill Number</label>
+                                <input type="text" class="form-control" id="mpesa_shortcode" name="mpesa_shortcode" 
+                                       placeholder="e.g. 174379">
+                                <div class="form-text">Your Safaricom M-Pesa Till or Paybill number</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="mpesa_type" class="form-label">M-Pesa Integration Type</label>
+                                <select class="form-select" id="mpesa_type" name="mpesa_type">
+                                    <option value="till">Till Number (Buy Goods)</option>
+                                    <option value="paybill">Paybill Number</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-12">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    To fully configure M-Pesa integration, please contact system administrator to set up API credentials.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Tax Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Tax Settings</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="default_tax_rate" class="form-label">Default VAT Rate (%)</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="default_tax_rate" name="default_tax_rate" 
+                                           value="16" step="0.01" min="0">
+                                    <span class="input-group-text">%</span>
+                                </div>
+                                <div class="form-text">Standard KRA VAT rate is 16%</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="tax_pin" class="form-label">KRA PIN</label>
+                                <input type="text" class="form-control" id="tax_pin" name="tax_pin" 
+                                       placeholder="e.g. A123456789Z">
+                            </div>
+                            
+                            <div class="col-md-12 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enable_tims" name="enable_tims">
+                                    <label class="form-check-label" for="enable_tims">Enable KRA TIMS Integration</label>
+                                </div>
+                                <div class="form-text">Tax Invoice Management System integration for electronic tax invoices</div>
+                            </div>
+                        </div>
+                        
+                        <!-- System Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">System Settings</h5>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enable_offline_mode" name="enable_offline_mode" checked>
+                                    <label class="form-check-label" for="enable_offline_mode">Enable Offline Mode</label>
+                                </div>
+                                <div class="form-text">Allow sales when internet connection is unavailable</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="low_stock_alerts" name="low_stock_alerts" checked>
+                                    <label class="form-check-label" for="low_stock_alerts">Enable Low Stock Alerts</label>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="currency_format" class="form-label">Currency Format</label>
+                                <select class="form-select" id="currency_format" name="currency_format">
+                                    <option value="KES #,###.##" selected>KES #,###.##</option>
+                                    <option value="# KSh"># KSh</option>
+                                    <option value="KSh #">KSh #</option>
+                                </select>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="date_format" class="form-label">Date Format</label>
+                                <select class="form-select" id="date_format" name="date_format">
+                                    <option value="dd/mm/yyyy" selected>DD/MM/YYYY</option>
+                                    <option value="mm/dd/yyyy">MM/DD/YYYY</option>
+                                    <option value="yyyy-mm-dd">YYYY-MM-DD</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Toggle fields based on M-Pesa type
+        const mpesaType = document.getElementById('mpesa_type');
+        
+        mpesaType.addEventListener('change', function() {
+            // In a real implementation, this might show/hide additional fields
+            // For example, Paybill might need an account number field
+            if (this.value === 'paybill') {
+                // Show paybill-specific fields
+                console.log('Paybill selected');
+            } else {
+                // Show till-specific fields
+                console.log('Till selected');
+            }
+        });
+        
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(tooltipTriggerEl => {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    });
+</script>
+{% endblock %}

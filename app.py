@@ -1,0 +1,69 @@
+import os
+import logging
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import DeclarativeBase
+from flask_migrate import Migrate
+from flask_jwt_extended import JWTManager
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+
+# Define base class for SQLAlchemy models
+class Base(DeclarativeBase):
+    pass
+
+# Initialize SQLAlchemy
+db = SQLAlchemy(model_class=Base)
+
+# Create Flask application
+app = Flask(__name__)
+
+# Set secret key from environment variable
+app.secret_key = os.environ.get("SESSION_SECRET", "kenya_pos_default_secret_key")
+
+# Configure proxy fix middleware for proper URL generation
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Configure database connection
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///kenyan_pos.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_recycle": 300,
+    "pool_pre_ping": True,
+}
+
+# Initialize JWT for authentication
+app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", app.secret_key)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 86400  # 24 hours
+jwt = JWTManager(app)
+
+# Initialize database with app
+db.init_app(app)
+
+# Initialize migrations
+migrate = Migrate(app, db)
+
+# Import routes after app is created to avoid circular imports
+with app.app_context():
+    # Import models so they are registered with SQLAlchemy
+    from models import User, Role, Store, Product, Category, Inventory, Sale, SaleItem, Customer, Payment, Supplier
+    
+    # Create all tables if they don't exist
+    db.create_all()
+    
+    # Import routes after DB initialization
+    from routes import register_routes
+    register_routes(app)
+
+# Configure M-Pesa credentials
+app.config["MPESA_CONSUMER_KEY"] = os.environ.get("MPESA_CONSUMER_KEY", "")
+app.config["MPESA_CONSUMER_SECRET"] = os.environ.get("MPESA_CONSUMER_SECRET", "")
+app.config["MPESA_SHORTCODE"] = os.environ.get("MPESA_SHORTCODE", "")
+app.config["MPESA_PASSKEY"] = os.environ.get("MPESA_PASSKEY", "")
+app.config["MPESA_CALLBACK_URL"] = os.environ.get("MPESA_CALLBACK_URL", "")
+app.config["MPESA_ENVIRONMENT"] = os.environ.get("MPESA_ENVIRONMENT", "sandbox")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

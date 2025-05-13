@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Kenyan Cloud POS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-card .card-value {
+        font-size: 2rem;
+        font-weight: 700;
+    }
+    .dashboard-stat {
+        border-left: 4px solid var(--bs-primary);
+    }
+    .dashboard-stat.sales {
+        border-left-color: var(--bs-success);
+    }
+    .dashboard-stat.inventory {
+        border-left-color: var(--bs-warning);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0"><i class="fas fa-tachometer-alt me-2"></i>Dashboard</h1>
+        
+        <div class="card">
+            <div class="card-body p-2 d-flex align-items-center">
+                <div class="input-group">
+                    <input type="date" class="form-control" id="start-date" name="start_date">
+                    <span class="input-group-text">to</span>
+                    <input type="date" class="form-control" id="end-date" name="end_date">
+                    <button type="button" class="btn btn-primary" id="apply-date-range">
+                        <i class="fas fa-filter me-1"></i> Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Key statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card dashboard-card sales-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Today's Sales</h5>
+                    <div class="card-value text-success">KES {{ "{:,.2f}".format(today_sales_amount) }}</div>
+                    <div class="text-muted">{{ today_sales_count }} transactions</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-card inventory-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Low Stock Items</h5>
+                    <div class="card-value text-warning">{{ low_stock_count }}</div>
+                    <div class="text-muted">Items below reorder level</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-card customers-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Top Category</h5>
+                    <div class="card-value text-info">Groceries</div>
+                    <div class="text-muted">36% of sales</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card dashboard-card alert-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">M-Pesa Transactions</h5>
+                    <div class="card-value text-primary">65%</div>
+                    <div class="text-muted">Of payment methods</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Sales Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="sales-chart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment Methods</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="payment-methods-chart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <!-- Recent Sales -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Recent Sales</h5>
+                    <a href="{{ url_for('sales_report') }}" class="btn btn-sm btn-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Date</th>
+                                    <th>Items</th>
+                                    <th class="text-end">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if recent_sales %}
+                                    {% for sale in recent_sales %}
+                                    <tr>
+                                        <td>{{ sale.reference }}</td>
+                                        <td>{{ sale.sale_date.strftime('%d/%m/%Y %H:%M') }}</td>
+                                        <td>{{ sale.items|length }}</td>
+                                        <td class="text-end">KES {{ "{:,.2f}".format(sale.total_amount) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-3">No recent sales</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <!-- Low Stock Alerts -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Low Stock Alerts</h5>
+                    <a href="{{ url_for('inventory') }}" class="btn btn-sm btn-primary">View Inventory</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th class="text-center">Current Stock</th>
+                                    <th class="text-center">Reorder Level</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if low_stock_items %}
+                                    {% for product, inventory in low_stock_items %}
+                                    <tr class="{% if inventory.quantity <= 0 %}table-danger{% else %}table-warning{% endif %}">
+                                        <td>{{ product.name }}</td>
+                                        <td>{{ product.category.name if product.category else 'N/A' }}</td>
+                                        <td class="text-center">{{ inventory.quantity }}</td>
+                                        <td class="text-center">{{ inventory.reorder_level }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" class="text-center py-3">No low stock items</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

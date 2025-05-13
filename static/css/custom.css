@@ -1,0 +1,191 @@
+/* Custom CSS for Kenya POS System */
+
+/* Main layout and branding */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+/* Brand colors - using Bootstrap variables for consistency */
+:root {
+    --brand-primary: var(--bs-primary);
+    --brand-secondary: var(--bs-secondary);
+    --brand-success: var(--bs-success);
+    --brand-warning: var(--bs-warning);
+    --brand-danger: var(--bs-danger);
+}
+
+/* Sidebar customization */
+.sidebar {
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    min-height: 100vh;
+}
+
+.sidebar .nav-link {
+    padding: 0.8rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 0.3rem;
+}
+
+.sidebar .nav-link.active {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+.sidebar .nav-link:hover:not(.active) {
+    background-color: rgba(var(--bs-primary-rgb), 0.1);
+}
+
+.sidebar .nav-link i {
+    width: 24px;
+    text-align: center;
+    margin-right: 0.5rem;
+}
+
+/* Card customizations for dashboard */
+.card.dashboard-card {
+    transition: transform 0.2s;
+    border-left: 4px solid var(--bs-primary);
+}
+
+.card.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+.card.dashboard-card .card-value {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.card.dashboard-card.sales-card {
+    border-left-color: var(--bs-success);
+}
+
+.card.dashboard-card.inventory-card {
+    border-left-color: var(--bs-warning);
+}
+
+.card.dashboard-card.customers-card {
+    border-left-color: var(--bs-info);
+}
+
+.card.dashboard-card.alert-card {
+    border-left-color: var(--bs-danger);
+}
+
+/* POS styles */
+.pos-container {
+    display: flex;
+    height: calc(100vh - 60px);
+}
+
+.pos-product-grid {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.pos-cart {
+    max-height: calc(100vh - 260px);
+    overflow-y: auto;
+}
+
+.product-card {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.product-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Touch-friendly form controls */
+.form-control, .btn, .input-group-text {
+    padding: 0.5rem 0.75rem;
+    min-height: 42px;
+}
+
+select.form-select {
+    min-height: 42px;
+}
+
+/* Inventory indicators */
+.stock-warning {
+    color: var(--bs-warning);
+}
+
+.stock-danger {
+    color: var(--bs-danger);
+}
+
+.stock-success {
+    color: var(--bs-success);
+}
+
+/* Offline mode banner */
+#offline-banner {
+    background-color: var(--bs-warning);
+    color: var(--bs-dark);
+    text-align: center;
+    padding: 0.5rem;
+    display: none;
+}
+
+/* Make tables more readable */
+.table th {
+    font-weight: 600;
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+/* Receipt styling */
+.receipt {
+    font-family: monospace;
+    width: 300px;
+    margin: 0 auto;
+    padding: 10px;
+    border: 1px solid #ddd;
+    background-color: white;
+    color: black;
+}
+
+.receipt-header {
+    text-align: center;
+    margin-bottom: 10px;
+    border-bottom: 1px dashed #000;
+    padding-bottom: 10px;
+}
+
+.receipt-items {
+    margin: 10px 0;
+}
+
+.receipt-footer {
+    margin-top: 10px;
+    border-top: 1px dashed #000;
+    padding-top: 10px;
+    text-align: center;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+    .sidebar {
+        min-height: auto;
+        position: static;
+        width: 100%;
+    }
+    
+    .pos-container {
+        flex-direction: column;
+        height: auto;
+    }
+    
+    .pos-product-grid, .pos-cart {
+        max-height: none;
+        overflow-y: visible;
+    }
+}

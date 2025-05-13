@@ -1,0 +1,250 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales Reports - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4"><i class="fas fa-chart-line me-2"></i>Sales Reports</h1>
+    
+    <!-- Date Filter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="{{ url_for('sales_report') }}" class="row g-2">
+                <div class="col-md-4">
+                    <label for="start_date" class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="start_date" name="start_date" 
+                           value="{{ start_date.strftime('%Y-%m-%d') if start_date else '' }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="end_date" class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                           value="{{ end_date.strftime('%Y-%m-%d') if end_date else '' }}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter me-1"></i> Apply Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Sales Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-primary bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary">Total Sales</h5>
+                    <div class="display-5 mb-2">{{ total_sales }}</div>
+                    <div class="text-muted">Transactions</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card bg-success bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">Total Revenue</h5>
+                    <div class="display-5 mb-2">KES {{ "{:,.2f}".format(total_amount) }}</div>
+                    <div class="text-muted">Sales amount</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card bg-info bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-info">Average Sale</h5>
+                    <div class="display-5 mb-2">
+                        KES {{ "{:,.2f}".format(total_amount / total_sales if total_sales else 0) }}
+                    </div>
+                    <div class="text-muted">Per transaction</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Payment Methods Chart -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment Methods</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="payment-methods-chart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Payment Summary</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Payment Method</th>
+                                <th class="text-end">Amount</th>
+                                <th class="text-end">Percentage</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for method, amount in payment_methods.items() %}
+                            <tr>
+                                <td>{{ method | title }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(amount) }}</td>
+                                <td class="text-end">{{ "{:.1f}".format(amount / total_amount * 100 if total_amount else 0) }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Sales Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Sales Transactions</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-2">
+                    <i class="fas fa-file-export me-1"></i> Export
+                </button>
+                <button class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Reference</th>
+                            <th>Date & Time</th>
+                            <th>Customer</th>
+                            <th>Cashier</th>
+                            <th class="text-center">Items</th>
+                            <th class="text-end">Total</th>
+                            <th>Payment</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if sales %}
+                            {% for sale in sales %}
+                            <tr>
+                                <td>{{ sale.reference }}</td>
+                                <td>{{ sale.sale_date.strftime('%d/%m/%Y %H:%M') }}</td>
+                                <td>{{ sale.customer.name if sale.customer else 'Walk-in Customer' }}</td>
+                                <td>{{ sale.cashier.username }}</td>
+                                <td class="text-center">{{ sale.items|length }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(sale.total_amount) }}</td>
+                                <td>
+                                    {% for payment in sale.payments %}
+                                    <span class="badge bg-{% if payment.payment_method == 'mpesa' %}info{% elif payment.payment_method == 'cash' %}success{% else %}secondary{% endif %}">
+                                        {{ payment.payment_method | upper }}
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">Unpaid</span>
+                                    {% endfor %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <button type="button" class="btn btn-sm btn-outline-primary view-sale-btn" data-id="{{ sale.id }}">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fas fa-receipt"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">No sales found for the selected period</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Payment methods chart
+        const paymentsCanvas = document.getElementById('payment-methods-chart');
+        
+        if (paymentsCanvas) {
+            // Get payment methods data
+            const paymentMethods = {
+                {% for method, amount in payment_methods.items() %}
+                "{{ method | title }}": {{ amount }},
+                {% endfor %}
+            };
+            
+            const labels = Object.keys(paymentMethods);
+            const data = Object.values(paymentMethods);
+            
+            // Colors for payment methods
+            const colors = {
+                'Mpesa': 'rgba(75, 192, 192, 0.6)',
+                'Cash': 'rgba(255, 206, 86, 0.6)',
+                'Card': 'rgba(153, 102, 255, 0.6)'
+            };
+            
+            const backgroundColors = labels.map(label => colors[label] || 'rgba(54, 162, 235, 0.6)');
+            
+            const paymentsChart = new Chart(paymentsCanvas, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: KES ${value.toLocaleString()} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // View sale buttons
+        const viewSaleButtons = document.querySelectorAll('.view-sale-btn');
+        
+        viewSaleButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const saleId = this.getAttribute('data-id');
+                // In a real implementation, this would open a modal with sale details
+                alert(`Viewing sale details for ID: ${saleId}`);
+            });
+        });
+    });
+</script>
+{% endblock %}

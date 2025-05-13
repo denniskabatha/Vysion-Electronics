@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventory Reports - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4"><i class="fas fa-chart-pie me-2"></i>Inventory Reports</h1>
+    
+    <!-- Inventory Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-primary">Total Products</h5>
+                    <div class="display-5">{{ inventory_items|length }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-success bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-success">Inventory Value</h5>
+                    <div class="display-5">KES {{ "{:,.2f}".format(total_value) }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-warning bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-warning">Low Stock Items</h5>
+                    <div class="display-5">
+                        {{ inventory_items|selectattr('1.quantity', 'le', inventory_items|map(attribute='1.reorder_level')|list|first)|list|length }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-3">
+            <div class="card bg-danger bg-opacity-10 h-100">
+                <div class="card-body text-center">
+                    <h5 class="card-title text-danger">Out of Stock</h5>
+                    <div class="display-5">
+                        {{ inventory_items|selectattr('1.quantity', 'le', 0)|list|length }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Charts -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Inventory by Category</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="category-chart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Inventory Value by Category</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Category</th>
+                                <th class="text-center">Products</th>
+                                <th class="text-center">Quantity</th>
+                                <th class="text-end">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category_name, data in categories.items() %}
+                            <tr>
+                                <td>{{ category_name }}</td>
+                                <td class="text-center">{{ data.count }}</td>
+                                <td class="text-center">{{ data.quantity }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(data.value) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-light">
+                                <th>Total</th>
+                                <th class="text-center">{{ inventory_items|length }}</th>
+                                <th class="text-center">{{ categories.values()|map(attribute='quantity')|sum }}</th>
+                                <th class="text-end">KES {{ "{:,.2f}".format(total_value) }}</th>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Inventory Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">Inventory Details</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-primary me-2">
+                    <i class="fas fa-file-export me-1"></i> Export
+                </button>
+                <button class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th class="text-center">In Stock</th>
+                            <th class="text-center">Reorder Level</th>
+                            <th class="text-end">Cost Price</th>
+                            <th class="text-end">Selling Price</th>
+                            <th class="text-end">Inventory Value</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if inventory_items %}
+                            {% for product, inventory, category in inventory_items %}
+                            <tr class="{% if inventory.quantity <= 0 %}table-danger{% elif inventory.quantity <= inventory.reorder_level %}table-warning{% endif %}">
+                                <td>{{ product.name }}</td>
+                                <td>{{ category.name if category else 'Uncategorized' }}</td>
+                                <td class="text-center">{{ inventory.quantity }}</td>
+                                <td class="text-center">{{ inventory.reorder_level }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(product.cost_price) }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(product.selling_price) }}</td>
+                                <td class="text-end">KES {{ "{:,.2f}".format(product.cost_price * inventory.quantity) }}</td>
+                                <td class="text-center">
+                                    {% if inventory.quantity <= 0 %}
+                                    <span class="badge bg-danger">Out of Stock</span>
+                                    {% elif inventory.quantity <= inventory.reorder_level %}
+                                    <span class="badge bg-warning text-dark">Low Stock</span>
+                                    {% else %}
+                                    <span class="badge bg-success">In Stock</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4">No inventory data available</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Category chart
+        const categoryCanvas = document.getElementById('category-chart');
+        
+        if (categoryCanvas) {
+            // Prepare data from categories
+            const categoryData = {
+                {% for category_name, data in categories.items() %}
+                "{{ category_name }}": {{ data.count }},
+                {% endfor %}
+            };
+            
+            const labels = Object.keys(categoryData);
+            const data = Object.values(categoryData);
+            
+            // Generate colors
+            const backgroundColors = [
+                'rgba(255, 99, 132, 0.6)',
+                'rgba(54, 162, 235, 0.6)',
+                'rgba(255, 206, 86, 0.6)',
+                'rgba(75, 192, 192, 0.6)',
+                'rgba(153, 102, 255, 0.6)',
+                'rgba(255, 159, 64, 0.6)',
+                'rgba(199, 199, 199, 0.6)'
+            ];
+            
+            const categoryChart = new Chart(categoryCanvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors.slice(0, labels.length),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${context.label}: ${value} products (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

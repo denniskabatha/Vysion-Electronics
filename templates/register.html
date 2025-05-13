@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block title %}Register New User - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-user-plus me-2"></i>Register New User</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{{ url_for('register') }}">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label">Username <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="first_name" class="form-label">First Name</label>
+                                <input type="text" class="form-control" id="first_name" name="first_name">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="last_name" class="form-label">Last Name</label>
+                                <input type="text" class="form-control" id="last_name" name="last_name">
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" placeholder="e.g. 0712345678">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="role_id" class="form-label">Role <span class="text-danger">*</span></label>
+                                <select class="form-select" id="role_id" name="role_id" required>
+                                    <option value="" selected disabled>Select role</option>
+                                    {% for role in roles %}
+                                    <option value="{{ role.id }}">{{ role.name | title }} - {{ role.description }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="store_id" class="form-label">Assigned Store <span class="text-danger">*</span></label>
+                                <select class="form-select" id="store_id" name="store_id" required>
+                                    <option value="" selected disabled>Select store</option>
+                                    {% for store in stores %}
+                                    <option value="{{ store.id }}">{{ store.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                                <div class="form-text">Password must be at least 8 characters</div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('users') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Users
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-plus me-1"></i> Register User
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

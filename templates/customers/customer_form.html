@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}
+    {% if edit_mode %}Edit Customer{% else %}Add New Customer{% endif %} - Kenyan Cloud POS
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-{% if edit_mode %}edit{% else %}user-plus{% endif %} me-2"></i>
+                        {% if edit_mode %}Edit Customer: {{ customer.name }}{% else %}Add New Customer{% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% if edit_mode %}{{ url_for('edit_customer', customer_id=customer.id) }}{% else %}{{ url_for('add_customer') }}{% endif %}">
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="name" class="form-label">Full Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" 
+                                       value="{% if customer %}{{ customer.name }}{% endif %}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">Phone Number</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">+254</span>
+                                    <input type="tel" class="form-control" id="phone" name="phone" 
+                                           value="{% if customer %}{{ customer.phone }}{% endif %}" 
+                                           placeholder="e.g. 712345678">
+                                </div>
+                                <div class="form-text">Enter without leading zero</div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{% if customer %}{{ customer.email }}{% endif %}">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="address" class="form-label">Address</label>
+                            <textarea class="form-control" id="address" name="address" rows="3">{% if customer %}{{ customer.address }}{% endif %}</textarea>
+                        </div>
+                        
+                        {% if edit_mode %}
+                        <div class="mb-3">
+                            <label for="loyalty_points" class="form-label">Loyalty Points</label>
+                            <input type="number" class="form-control" id="loyalty_points" name="loyalty_points" 
+                                   value="{{ customer.loyalty_points }}" min="0">
+                        </div>
+                        {% endif %}
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <a href="{{ url_for('customers') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Customers
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-{% if edit_mode %}save{% else %}user-plus{% endif %} me-1"></i> 
+                                {% if edit_mode %}Update Customer{% else %}Add Customer{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

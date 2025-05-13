@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+
+{% block title %}Checkout - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-cash-register me-2"></i>Sale Checkout</h4>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h5>Sale Summary</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th>Item</th>
+                                        <th>Quantity</th>
+                                        <th>Unit Price</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="checkout-items">
+                                    <!-- Items will be populated with JavaScript -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Subtotal:</th>
+                                        <td id="checkout-subtotal">KES 0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Tax:</th>
+                                        <td id="checkout-tax">KES 0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Discount:</th>
+                                        <td id="checkout-discount">KES 0.00</td>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Total:</th>
+                                        <td id="checkout-total" class="fw-bold">KES 0.00</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5>Payment Method</h5>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="payment-method" id="payment-cash" value="cash" checked>
+                                <label class="form-check-label" for="payment-cash">
+                                    <i class="fas fa-money-bill me-1"></i> Cash
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="payment-method" id="payment-mpesa" value="mpesa">
+                                <label class="form-check-label" for="payment-mpesa">
+                                    <i class="fas fa-mobile-alt me-1"></i> M-Pesa
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="payment-method" id="payment-card" value="card">
+                                <label class="form-check-label" for="payment-card">
+                                    <i class="fas fa-credit-card me-1"></i> Card
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- M-Pesa Form (hidden by default) -->
+                        <div id="mpesa-form" class="payment-form" style="display: none;">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label for="mpesa-phone" class="form-label">Customer M-Pesa Phone Number</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">+254</span>
+                                            <input type="tel" class="form-control" id="mpesa-phone" placeholder="712345678" required>
+                                        </div>
+                                        <div class="form-text">Enter the phone number without leading zero or country code</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Cash Form (visible by default) -->
+                        <div id="cash-form" class="payment-form">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="cash-amount" class="form-label">Cash Tendered</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">KES</span>
+                                                <input type="number" class="form-control" id="cash-amount" step="0.01" min="0">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="cash-change" class="form-label">Change</label>
+                                            <div class="input-group">
+                                                <span class="input-group-text">KES</span>
+                                                <input type="text" class="form-control" id="cash-change" readonly>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Card Form (hidden by default) -->
+                        <div id="card-form" class="payment-form" style="display: none;">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <p>Please use the card payment terminal to process the payment.</p>
+                                    <p><i class="fas fa-credit-card fa-3x mb-3"></i></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('pos') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to POS
+                        </a>
+                        <button type="button" id="complete-sale-btn" class="btn btn-success btn-lg">
+                            <i class="fas fa-check-circle me-1"></i> Complete Sale
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Switch between payment methods
+        const paymentMethods = document.querySelectorAll('input[name="payment-method"]');
+        const paymentForms = document.querySelectorAll('.payment-form');
+        
+        paymentMethods.forEach(method => {
+            method.addEventListener('change', function() {
+                // Hide all forms
+                paymentForms.forEach(form => form.style.display = 'none');
+                
+                // Show selected form
+                const selectedMethod = this.value;
+                document.getElementById(`${selectedMethod}-form`).style.display = 'block';
+            });
+        });
+        
+        // Cash change calculation
+        const cashAmount = document.getElementById('cash-amount');
+        const cashChange = document.getElementById('cash-change');
+        const checkoutTotal = document.getElementById('checkout-total');
+        
+        // Extract total amount from text (e.g., "KES 1,000.00" to 1000)
+        const totalText = checkoutTotal.textContent;
+        const totalAmount = parseFloat(totalText.replace(/[^0-9.]/g, '')) || 0;
+        
+        cashAmount.addEventListener('input', function() {
+            const tendered = parseFloat(this.value) || 0;
+            const change = tendered - totalAmount;
+            
+            if (change >= 0) {
+                cashChange.value = change.toFixed(2);
+            } else {
+                cashChange.value = "Insufficient amount";
+            }
+        });
+        
+        // Set minimum cash amount to total
+        cashAmount.min = totalAmount;
+        cashAmount.value = totalAmount;
+        
+        // Complete sale button
+        document.getElementById('complete-sale-btn').addEventListener('click', function() {
+            alert('Sale completed successfully!');
+            window.location.href = "{{ url_for('pos') }}";
+        });
+    });
+</script>
+{% endblock %}
