@@ -102,7 +102,8 @@ class Product(db.Model):
     # Foreign keys
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
-    template_id = db.Column(db.Integer, db.ForeignKey('product_template.id'))
+    # Comment out template_id for now as it's not in the database yet
+    # template_id = db.Column(db.Integer, db.ForeignKey('product_template.id'))
     
     # Relationships
     inventory = db.relationship('Inventory', backref='product', lazy=True)
@@ -272,11 +273,13 @@ class ProductTemplate(db.Model):
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
     
     # Relationships
-    products = db.relationship('Product', backref='template', lazy=True)
+    # Comment out relationship to Product for now
+    # products = db.relationship('Product', backref='template', lazy=True)
     
     @property
     def products_count(self):
-        return Product.query.filter_by(template_id=self.id).count()
+        # Just return 0 for now since template_id doesn't exist in Product yet
+        return 0
     
     def __repr__(self):
         return f"<ProductTemplate {self.name}>"

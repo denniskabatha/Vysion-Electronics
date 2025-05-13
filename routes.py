@@ -1092,10 +1092,10 @@ def register_routes(app):
             
             template = ProductTemplate.query.get_or_404(template_id)
             
-            # Check if any products are using this template
-            if Product.query.filter_by(template_id=template_id).count() > 0:
-                flash(f'Cannot delete template "{template.name}" because it is being used by products.', 'danger')
-                return redirect(url_for('product_templates'))
+            # Comment out for now as template_id doesn't exist in Product yet
+            # if Product.query.filter_by(template_id=template_id).count() > 0:
+            #     flash(f'Cannot delete template "{template.name}" because it is being used by products.', 'danger')
+            #     return redirect(url_for('product_templates'))
                 
             db.session.delete(template)
             db.session.commit()
