@@ -963,9 +963,20 @@ def register_routes(app):
                         # Process each row
                         products_added = 0
                         errors = []
-                        categories_cache = {category.name.lower(): category.id for category in Category.query.all()}
+                        skipped = 0
+                        duplicate_skus = 0
+                        duplicate_barcodes = 0
                         
-                        for row in csv_reader:
+                        # Cache data to minimize database queries
+                        categories_cache = {category.name.lower(): category.id for category in Category.query.all()}
+                        existing_skus = {product.sku for product in Product.query.with_entities(Product.sku).all() if product.sku}
+                        existing_barcodes = {product.barcode for product in Product.query.with_entities(Product.barcode).all() if product.barcode}
+                        
+                        # Process in batches for better performance with large files
+                        batch_size = 100
+                        batch = []
+                        
+                        for row_num, row in enumerate(csv_reader, 1):
                             try:
                                 # Extract data based on column mappings
                                 name = row[int(column_name)] if column_name else None
@@ -1012,7 +1023,20 @@ def register_routes(app):
                                     check_digit = (10 - (total % 10)) % 10
                                     barcode += str(check_digit)
                                 
-                                # Create product
+                                # Check for duplicates
+                                if sku and sku in existing_skus:
+                                    duplicate_skus += 1
+                                    if request.form.get('skip_duplicates', 'on') == 'on':
+                                        skipped += 1
+                                        continue
+                                
+                                if barcode and barcode in existing_barcodes:
+                                    duplicate_barcodes += 1
+                                    if request.form.get('skip_duplicates', 'on') == 'on':
+                                        skipped += 1
+                                        continue
+                                
+                                # Create product object
                                 product = Product(
                                     name=name,
                                     description=description or f"Description for {name}",
@@ -1025,31 +1049,83 @@ def register_routes(app):
                                     supplier_id=default_supplier_id,
                                     is_active=True
                                 )
-                                db.session.add(product)
-                                db.session.flush()  # Get product ID without committing
                                 
-                                # Create inventory entry for current store
+                                # Add to batch for bulk insert
+                                batch.append(product)
+                                
+                                # Process in batches to improve performance
+                                if len(batch) >= batch_size:
+                                    db.session.add_all(batch)
+                                    db.session.flush()  # Get IDs without committing
+                                    
+                                    # Create inventory entries for each product in batch
+                                    for prod in batch:
+                                        inventory = Inventory(
+                                            product_id=prod.id,
+                                            store_id=session.get('store_id'),
+                                            quantity=int(quantity),
+                                            reorder_level=int(default_reorder_level),
+                                            last_restock_date=datetime.utcnow() if int(quantity) > 0 else None
+                                        )
+                                        db.session.add(inventory)
+                                        
+                                        # Update tracking
+                                        if sku and sku not in existing_skus:
+                                            existing_skus.add(sku)
+                                        if barcode and barcode not in existing_barcodes:
+                                            existing_barcodes.add(barcode)
+                                    
+                                    products_added += len(batch)
+                                    batch = []
+                                
+                            except Exception as e:
+                                errors.append(f"Error processing row: {str(e)}")
+                                continue
+                        
+                        # Process any remaining products in the last batch
+                        if batch:
+                            db.session.add_all(batch)
+                            db.session.flush()
+                            
+                            # Create inventory entries for remaining products
+                            for prod in batch:
                                 inventory = Inventory(
-                                    product_id=product.id,
+                                    product_id=prod.id,
                                     store_id=session.get('store_id'),
                                     quantity=int(quantity),
                                     reorder_level=int(default_reorder_level),
                                     last_restock_date=datetime.utcnow() if int(quantity) > 0 else None
                                 )
                                 db.session.add(inventory)
-                                products_added += 1
-                                
-                            except Exception as e:
-                                errors.append(f"Error processing row: {str(e)}")
-                                continue
+                            
+                            products_added += len(batch)
                         
+                        # Either commit all or roll back
                         if products_added > 0:
                             db.session.commit()
-                            flash(f'Successfully imported {products_added} products. {len(errors)} errors occurred.', 'success')
+                            
+                            # Create detailed success message
+                            success_msg = f'Successfully imported {products_added} products'
+                            details = []
+                            
+                            if skipped > 0:
+                                details.append(f"{skipped} duplicates skipped")
+                            if duplicate_skus > 0:
+                                details.append(f"{duplicate_skus} duplicate SKUs")
+                            if duplicate_barcodes > 0:
+                                details.append(f"{duplicate_barcodes} duplicate barcodes")
+                            if len(errors) > 0:
+                                details.append(f"{len(errors)} errors")
+                                
+                            if details:
+                                success_msg += f" ({', '.join(details)})"
+                            
+                            flash(success_msg, 'success')
                         else:
                             db.session.rollback()
                             flash('No products were imported. Please check your file and mapping.', 'warning')
-                            
+                        
+                        # Report errors with row numbers for easier reference
                         if errors:
                             for error in errors[:5]:  # Show first 5 errors
                                 flash(error, 'warning')
@@ -1057,6 +1133,11 @@ def register_routes(app):
                                 flash(f'... and {len(errors) - 5} more errors. Check the log for details.', 'warning')
                                 for error in errors:
                                     logging.error(error)
+                                    
+                            # Generate downloadable error log if there are many errors
+                            if len(errors) > 10:
+                                session['import_errors'] = errors
+                                flash(f'<a href="{url_for("download_import_errors")}" class="alert-link">Download complete error log</a>', 'info')
                     
                     return redirect(url_for('inventory'))
                 except Exception as e:
@@ -1220,8 +1301,47 @@ def register_routes(app):
             
         return render_template('inventory/barcodes.html', products=products)
         
+    @app.route('/inventory/download-import-errors', methods=['GET'])
+    @login_required
+    @not_cashier_required
+    def download_import_errors():
+        """Download error log from product import."""
+        if 'import_errors' not in session or not session['import_errors']:
+            flash('No import errors found', 'warning')
+            return redirect(url_for('import_products'))
+            
+        errors = session['import_errors']
+        
+        # Create CSV with error data
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Write header
+        writer.writerow(['Error Number', 'Error Message'])
+        
+        # Write error data
+        for i, error in enumerate(errors, 1):
+            writer.writerow([i, error])
+        
+        # Go to the beginning of the stream
+        output.seek(0)
+        
+        # Create a response with the CSV
+        response = send_file(
+            io.BytesIO(output.getvalue().encode()),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'product_import_errors_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        )
+        
+        # Clear the errors from session after download
+        session.pop('import_errors', None)
+        
+        return response
+    
     @app.route('/inventory/download-product-template', methods=['GET'])
     @login_required
+    @not_cashier_required
     def download_product_template():
         """Download sample CSV template for product import."""
         # Create a CSV in memory
