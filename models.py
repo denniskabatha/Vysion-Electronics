@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from app import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -101,6 +102,7 @@ class Product(db.Model):
     # Foreign keys
     category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
     supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
+    template_id = db.Column(db.Integer, db.ForeignKey('product_template.id'))
     
     # Relationships
     inventory = db.relationship('Inventory', backref='product', lazy=True)
@@ -109,6 +111,27 @@ class Product(db.Model):
     @hybrid_property
     def price_with_tax(self):
         return self.selling_price * (1 + self.tax_rate / 100)
+    
+    def generate_barcode(self):
+        """Generate a unique barcode for this product."""
+        import random
+        
+        # Use 590 as prefix (Kenya's country code would be different, this is just for example)
+        prefix = "590"
+        # Add random digits to make a 12-digit number (for EAN-13)
+        for _ in range(9):
+            prefix += str(random.randint(0, 9))
+            
+        # Calculate check digit
+        total = 0
+        for i, digit in enumerate(prefix):
+            if i % 2 == 0:
+                total += int(digit)
+            else:
+                total += int(digit) * 3
+        check_digit = (10 - (total % 10)) % 10
+        
+        return prefix + str(check_digit)
     
     def __repr__(self):
         return f"<Product {self.name}>"
@@ -227,6 +250,56 @@ class Supplier(db.Model):
     
     # Relationships
     products = db.relationship('Product', backref='supplier', lazy=True)
+    product_templates = db.relationship('ProductTemplate', backref='supplier', lazy=True)
     
     def __repr__(self):
         return f"<Supplier {self.name}>"
+
+# Product template model
+class ProductTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255))
+    tax_rate = db.Column(db.Float, default=16.0)  # Default to standard KRA VAT rate
+    reorder_level = db.Column(db.Integer, default=5)
+    sku_prefix = db.Column(db.String(20))
+    description_template = db.Column(db.String(255))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign keys
+    category_id = db.Column(db.Integer, db.ForeignKey('category.id'))
+    supplier_id = db.Column(db.Integer, db.ForeignKey('supplier.id'))
+    
+    # Relationships
+    products = db.relationship('Product', backref='template', lazy=True)
+    
+    @property
+    def products_count(self):
+        return Product.query.filter_by(template_id=self.id).count()
+    
+    def __repr__(self):
+        return f"<ProductTemplate {self.name}>"
+
+# Label template model
+class LabelTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255))
+    config = db.Column(db.Text)  # JSON configuration for the label
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    
+    # Relationships
+    user = db.relationship('User', backref='label_templates')
+    
+    @property
+    def config_dict(self):
+        """Return the config as a dictionary."""
+        if self.config:
+            return json.loads(self.config)
+        return {}
+    
+    def __repr__(self):
+        return f"<LabelTemplate {self.name}>"

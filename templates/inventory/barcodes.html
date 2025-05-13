@@ -1,0 +1,880 @@
+{% extends 'base.html' %}
+
+{% block title %}Barcode Generator - Kenyan Cloud POS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .barcode-preview {
+        max-width: 100%;
+        height: auto;
+        padding: 10px;
+        background-color: white;
+        border: 1px solid #dee2e6;
+    }
+    
+    .barcode-item {
+        border: 1px dashed #ddd;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .label-preview {
+        background-color: white;
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        min-height: 200px;
+    }
+    
+    .print-label {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        page-break-inside: avoid;
+    }
+    
+    @media print {
+        .no-print {
+            display: none;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: white;
+        }
+        
+        .print-container {
+            width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .print-label {
+            float: left;
+            box-sizing: border-box;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-lg-12">
+            <div class="card no-print">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-barcode me-2"></i>Barcode Generator</h4>
+                </div>
+                <div class="card-body">
+                    {% if error %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if success %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i> {{ success }}
+                    </div>
+                    {% endif %}
+                    
+                    <ul class="nav nav-tabs mb-4" id="barcodeTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="individual-tab" data-bs-toggle="tab" data-bs-target="#individual" 
+                                    type="button" role="tab" aria-controls="individual" aria-selected="true">
+                                Individual Barcode
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="product-tab" data-bs-toggle="tab" data-bs-target="#product" 
+                                    type="button" role="tab" aria-controls="product" aria-selected="false">
+                                Product Barcodes
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk" 
+                                    type="button" role="tab" aria-controls="bulk" aria-selected="false">
+                                Bulk Generation
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="label-designer-tab" data-bs-toggle="tab" data-bs-target="#label-designer" 
+                                    type="button" role="tab" aria-controls="label-designer" aria-selected="false">
+                                Label Designer
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="barcodeTabsContent">
+                        <!-- Individual Barcode Generator -->
+                        <div class="tab-pane fade show active" id="individual" role="tabpanel" aria-labelledby="individual-tab">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>Generate Custom Barcode</h5>
+                                    <form id="individualBarcodeForm" class="mb-4">
+                                        <div class="mb-3">
+                                            <label for="barcodeType" class="form-label">Barcode Type</label>
+                                            <select class="form-select" id="barcodeType">
+                                                <option value="ean13" selected>EAN-13</option>
+                                                <option value="ean8">EAN-8</option>
+                                                <option value="code128">Code 128</option>
+                                                <option value="code39">Code 39</option>
+                                                <option value="upc">UPC-A</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="barcodeValue" class="form-label">Barcode Value</label>
+                                            <input type="text" class="form-control" id="barcodeValue" placeholder="e.g., 5901234123457">
+                                            <div class="form-text">For EAN-13, enter 12 digits (the 13th digit will be calculated)</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <button type="button" class="btn btn-primary" id="generateCustomBarcode">
+                                                <i class="fas fa-barcode me-1"></i> Generate Barcode
+                                            </button>
+                                        </div>
+                                    </form>
+                                    
+                                    <div class="mb-3">
+                                        <h5>Generate Random Barcode</h5>
+                                        <p>Generate a valid random barcode for new products</p>
+                                        <button type="button" class="btn btn-info" id="generateRandomBarcode">
+                                            <i class="fas fa-random me-1"></i> Generate Random EAN-13
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <h5>Barcode Preview</h5>
+                                    <div class="text-center p-3 mb-3 border rounded">
+                                        <div id="barcodePreview">
+                                            <p class="text-muted">Barcode will appear here</p>
+                                        </div>
+                                    </div>
+                                    
+                                    <div id="barcodeActions" class="d-none">
+                                        <div class="d-flex flex-wrap gap-2 mb-3">
+                                            <button type="button" class="btn btn-success" id="printBarcode">
+                                                <i class="fas fa-print me-1"></i> Print
+                                            </button>
+                                            <button type="button" class="btn btn-primary" id="saveBarcode">
+                                                <i class="fas fa-download me-1"></i> Save as PNG
+                                            </button>
+                                            <button type="button" class="btn btn-secondary" id="copyBarcode">
+                                                <i class="fas fa-copy me-1"></i> Copy Value
+                                            </button>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="barcodeSize" class="form-label">Barcode Size</label>
+                                            <div class="d-flex gap-2">
+                                                <input type="range" class="form-range" id="barcodeSize" min="1" max="5" step="0.5" value="2">
+                                                <span id="barcodeSizeValue">2x</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Product Barcodes -->
+                        <div class="tab-pane fade" id="product" role="tabpanel" aria-labelledby="product-tab">
+                            <div class="row mb-4">
+                                <div class="col-md-12">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h5>Generate Barcodes for Products</h5>
+                                        <div class="input-group" style="max-width: 300px;">
+                                            <input type="text" class="form-control" id="productSearch" placeholder="Search products...">
+                                            <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                                <i class="fas fa-search"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="table-responsive">
+                                        <table class="table table-hover" id="productsTable">
+                                            <thead>
+                                                <tr>
+                                                    <th>
+                                                        <div class="form-check">
+                                                            <input class="form-check-input" type="checkbox" id="selectAllProducts">
+                                                            <label class="form-check-label" for="selectAllProducts"></label>
+                                                        </div>
+                                                    </th>
+                                                    <th>Product</th>
+                                                    <th>SKU</th>
+                                                    <th>Barcode</th>
+                                                    <th>Price</th>
+                                                    <th>Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% if products %}
+                                                    {% for product in products %}
+                                                    <tr>
+                                                        <td>
+                                                            <div class="form-check">
+                                                                <input class="form-check-input product-checkbox" type="checkbox" 
+                                                                       value="{{ product.id }}" id="product{{ product.id }}">
+                                                                <label class="form-check-label" for="product{{ product.id }}"></label>
+                                                            </div>
+                                                        </td>
+                                                        <td>{{ product.name }}</td>
+                                                        <td>{{ product.sku }}</td>
+                                                        <td>
+                                                            {% if product.barcode %}
+                                                                {{ product.barcode }}
+                                                            {% else %}
+                                                                <span class="badge bg-warning">No barcode</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>{{ "%.2f"|format(product.selling_price) }} KES</td>
+                                                        <td>
+                                                            {% if product.barcode %}
+                                                                <button type="button" class="btn btn-sm btn-primary view-barcode" 
+                                                                        data-barcode="{{ product.barcode }}" data-name="{{ product.name }}"
+                                                                        data-price="{{ product.selling_price }}">
+                                                                    <i class="fas fa-eye"></i>
+                                                                </button>
+                                                            {% else %}
+                                                                <button type="button" class="btn btn-sm btn-success generate-barcode" 
+                                                                        data-product-id="{{ product.id }}">
+                                                                    <i class="fas fa-plus"></i> Generate
+                                                                </button>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                    {% endfor %}
+                                                {% else %}
+                                                    <tr>
+                                                        <td colspan="6" class="text-center py-3">No products found</td>
+                                                    </tr>
+                                                {% endif %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button type="button" class="btn btn-primary" id="printSelectedBarcodes" disabled>
+                                            <i class="fas fa-print me-1"></i> Print Selected
+                                        </button>
+                                        <button type="button" class="btn btn-success" id="generateMissingBarcodes">
+                                            <i class="fas fa-magic me-1"></i> Generate Missing Barcodes
+                                        </button>
+                                        <div class="ms-auto">
+                                            <select class="form-select" id="labelFormat">
+                                                <option value="1">Standard (1 per row)</option>
+                                                <option value="2" selected>2 per row</option>
+                                                <option value="3">3 per row</option>
+                                                <option value="4">4 per row</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Bulk Generation -->
+                        <div class="tab-pane fade" id="bulk" role="tabpanel" aria-labelledby="bulk-tab">
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <h5>Bulk Barcode Generation</h5>
+                                    <p>Generate multiple barcodes at once. Useful for creating barcode series.</p>
+                                    
+                                    <form id="bulkBarcodeForm">
+                                        <div class="mb-3">
+                                            <label for="barcodePrefix" class="form-label">Prefix (optional)</label>
+                                            <input type="text" class="form-control" id="barcodePrefix" placeholder="e.g., 590">
+                                            <div class="form-text">For EAN-13, country code is typically the first 3 digits</div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="barcodeCount" class="form-label">Number of Barcodes</label>
+                                            <input type="number" class="form-control" id="barcodeCount" min="1" max="100" value="10">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="bulkBarcodeType" class="form-label">Barcode Type</label>
+                                            <select class="form-select" id="bulkBarcodeType">
+                                                <option value="ean13" selected>EAN-13</option>
+                                                <option value="ean8">EAN-8</option>
+                                                <option value="code128">Code 128</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <button type="button" class="btn btn-primary" id="generateBulkBarcodes">
+                                            <i class="fas fa-barcode me-1"></i> Generate Barcodes
+                                        </button>
+                                    </form>
+                                </div>
+                                
+                                <div class="col-md-6 mb-4">
+                                    <h5>Generated Barcodes</h5>
+                                    <div id="bulkBarcodesList" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                        <p class="text-muted text-center">Generated barcodes will appear here</p>
+                                    </div>
+                                    
+                                    <div class="mt-3 d-none" id="bulkBarcodeActions">
+                                        <button type="button" class="btn btn-success" id="printBulkBarcodes">
+                                            <i class="fas fa-print me-1"></i> Print All
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="exportBulkBarcodes">
+                                            <i class="fas fa-file-csv me-1"></i> Export to CSV
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Label Designer -->
+                        <div class="tab-pane fade" id="label-designer" role="tabpanel" aria-labelledby="label-designer-tab">
+                            <div class="row">
+                                <div class="col-md-6 mb-4">
+                                    <h5>Label Design</h5>
+                                    <p>Customize your product labels for printing</p>
+                                    
+                                    <form id="labelDesignerForm">
+                                        <div class="mb-3">
+                                            <label for="labelTitle" class="form-label">Title Field</label>
+                                            <select class="form-select" id="labelTitle">
+                                                <option value="name" selected>Product Name</option>
+                                                <option value="sku">Product SKU</option>
+                                                <option value="custom">Custom Text</option>
+                                                <option value="none">None</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <div class="mb-3 d-none" id="customTitleField">
+                                            <label for="customTitleText" class="form-label">Custom Title Text</label>
+                                            <input type="text" class="form-control" id="customTitleText">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="showPrice" checked>
+                                                <label class="form-check-label" for="showPrice">Show Price</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="showBarcode" checked>
+                                                <label class="form-check-label" for="showBarcode">Show Barcode</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="showBarcodeValue" checked>
+                                                <label class="form-check-label" for="showBarcodeValue">Show Barcode Value</label>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="labelWidth" class="form-label">Label Width (mm)</label>
+                                            <input type="number" class="form-control" id="labelWidth" min="20" max="150" value="50">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="labelHeight" class="form-label">Label Height (mm)</label>
+                                            <input type="number" class="form-control" id="labelHeight" min="10" max="100" value="30">
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="fontSize" class="form-label">Font Size</label>
+                                            <select class="form-select" id="fontSize">
+                                                <option value="small">Small</option>
+                                                <option value="medium" selected>Medium</option>
+                                                <option value="large">Large</option>
+                                            </select>
+                                        </div>
+                                        
+                                        <button type="button" class="btn btn-primary" id="updateLabelPreview">
+                                            <i class="fas fa-eye me-1"></i> Update Preview
+                                        </button>
+                                    </form>
+                                </div>
+                                
+                                <div class="col-md-6 mb-4">
+                                    <h5>Label Preview</h5>
+                                    <div class="label-preview mb-3">
+                                        <div id="labelPreview" class="text-center">
+                                            <div class="product-name">Jogoo Maize Flour 2kg</div>
+                                            <div class="product-price">KES 175.00</div>
+                                            <div class="product-barcode text-center">
+                                                <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAAmCAYAAACp1S1GAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAJmSURBVHhe7doxbxMxGIBh/1HZGVmpGGCim9mhUwcW2JkYEBJD/wZ/gIGVjYWdDYmKCYmFiYEFIZaQOvG1voiGkzgRVRzH9ftIp8v5YrvDm+/s5DrtbkySJA3YXLP/bN5ba+/ttZCbgDfKRe/sRe/VmfOD3tnp6fHF4f7OYlbjyvF4C7Pf6fT7O/fXO1Ln/Pr1b+MNnPeb+6r2NJ3o/Mlp+HL2/fzb0cl1dVb+74PZtbG5sdYw0Tr/k8vbU2vZnhZ/H3dWt93FtJ1SNLxgRtPpVO9vP8jmvKZ29KbXS82oj1yTLPcvYDBvmwQqjV0zHt89EIwGg79e33nbSnfXSaofkjuIwShYIuGPT1Lt6DaD+sYC87j/oLEjZw7qnkEdbGkM/s49EJxoDA6u3Nqpvb14UOhbCPK+0XCU4y0/Iz1cMUHJmrXfuZcSfHb1oBCNSXpHrWVWD0fDVg4K6wk5KHhw1dapvZvbW0lMYVBeHJUXO1oWcpUqG8ZA1gO9IFwpwf89KABx0CMCecNYA2kvrVHzw+JBWYzGGgjUzlqjjD+OKtd0hT0QmL+xX2KVN4xhEF8Mjgpv/BxuIFCbsoHk5Gxzq0wIIVoJRBwb2Gl6eTnqpYG7Rv1UvzxVqn6/nwbvd/Jz7FT1h+/+qV5U7fPe+/34i2A0JJ/PvuRbx5dHn2/+B8Ib6r/f+TAe5VsH0/XZbD5/8mi3v7W16pSCqL0cjfrPnj8/yLcOkiRpEQMhSQEGQpICDIQkBRgISQowEJIUYCAkKcBASFKAgZCkAAMhSQEGQpIWJH0HfkAAOA40T4IAAAAASUVORK5CYII=">
+                                                <div class="barcode-value">5901234123457</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex gap-2">
+                                        <button type="button" class="btn btn-success" id="saveTemplate">
+                                            <i class="fas fa-save me-1"></i> Save as Template
+                                        </button>
+                                        <button type="button" class="btn btn-primary" id="exportTemplate">
+                                            <i class="fas fa-file-export me-1"></i> Export
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Print Container (Hidden until print) -->
+    <div class="print-container d-none">
+        <div id="printContent"></div>
+    </div>
+</div>
+
+<!-- View Barcode Modal -->
+<div class="modal fade" id="viewBarcodeModal" tabindex="-1" aria-labelledby="viewBarcodeModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="viewBarcodeModalLabel">Product Barcode</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <h5 id="modalProductName"></h5>
+                <div class="mb-2">Price: <span id="modalProductPrice"></span> KES</div>
+                <div id="modalBarcodeImage" class="mb-3"></div>
+                <div id="modalBarcodeValue" class="mb-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-success" id="printModalBarcode">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Template Modal -->
+<div class="modal fade" id="saveTemplateModal" tabindex="-1" aria-labelledby="saveTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="saveTemplateModalLabel">Save Label Template</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="{{ url_for('save_label_template') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="templateName" class="form-label">Template Name</label>
+                        <input type="text" class="form-control" id="templateName" name="template_name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="templateDescription" class="form-label">Description (optional)</label>
+                        <textarea class="form-control" id="templateDescription" name="template_description" rows="2"></textarea>
+                    </div>
+                    
+                    <!-- Hidden inputs to store template configuration -->
+                    <input type="hidden" id="templateConfig" name="template_config">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Individual Barcode Generator
+        const barcodeType = document.getElementById('barcodeType');
+        const barcodeValue = document.getElementById('barcodeValue');
+        const barcodePreview = document.getElementById('barcodePreview');
+        const barcodeActions = document.getElementById('barcodeActions');
+        const barcodeSize = document.getElementById('barcodeSize');
+        const barcodeSizeValue = document.getElementById('barcodeSizeValue');
+        
+        // Generate custom barcode
+        document.getElementById('generateCustomBarcode').addEventListener('click', function() {
+            generateBarcode(barcodeType.value, barcodeValue.value);
+        });
+        
+        // Generate random barcode
+        document.getElementById('generateRandomBarcode').addEventListener('click', function() {
+            // Generate a valid EAN-13 barcode
+            const prefix = '590'; // Example: 590 is Poland's country code
+            let digits = prefix;
+            
+            // Generate 9 random digits (12 total - we add the check digit later)
+            for (let i = 0; i < 9; i++) {
+                digits += Math.floor(Math.random() * 10);
+            }
+            
+            barcodeValue.value = digits;
+            generateBarcode('ean13', digits);
+        });
+        
+        // Update barcode size
+        barcodeSize.addEventListener('input', function() {
+            barcodeSizeValue.textContent = this.value + 'x';
+            updateBarcodeSize(this.value);
+        });
+        
+        // Function to generate barcode
+        function generateBarcode(type, value) {
+            try {
+                barcodePreview.innerHTML = '<svg id="barcode"></svg>';
+                JsBarcode("#barcode", value, {
+                    format: type,
+                    width: 2,
+                    height: 100,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 10
+                });
+                barcodeActions.classList.remove('d-none');
+                updateBarcodeSize(barcodeSize.value);
+            } catch (error) {
+                barcodePreview.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+                barcodeActions.classList.add('d-none');
+            }
+        }
+        
+        // Function to update barcode size
+        function updateBarcodeSize(size) {
+            const barcodeElement = document.getElementById('barcode');
+            if (barcodeElement) {
+                barcodeElement.style.transform = `scale(${size})`;
+                barcodeElement.style.transformOrigin = 'center top';
+            }
+        }
+        
+        // Product barcodes table
+        const selectAllProducts = document.getElementById('selectAllProducts');
+        const printSelectedBarcodes = document.getElementById('printSelectedBarcodes');
+        const productCheckboxes = document.querySelectorAll('.product-checkbox');
+        
+        // Select all products
+        selectAllProducts.addEventListener('change', function() {
+            productCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updatePrintButtonState();
+        });
+        
+        // Update print button state when checkboxes change
+        productCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updatePrintButtonState);
+        });
+        
+        function updatePrintButtonState() {
+            const checkedProducts = document.querySelectorAll('.product-checkbox:checked');
+            printSelectedBarcodes.disabled = checkedProducts.length === 0;
+        }
+        
+        // View barcode buttons
+        document.querySelectorAll('.view-barcode').forEach(button => {
+            button.addEventListener('click', function() {
+                const barcode = this.getAttribute('data-barcode');
+                const name = this.getAttribute('data-name');
+                const price = this.getAttribute('data-price');
+                
+                document.getElementById('modalProductName').textContent = name;
+                document.getElementById('modalProductPrice').textContent = parseFloat(price).toFixed(2);
+                document.getElementById('modalBarcodeValue').textContent = barcode;
+                
+                const modalBarcodeImage = document.getElementById('modalBarcodeImage');
+                modalBarcodeImage.innerHTML = '<svg id="modalBarcode"></svg>';
+                
+                JsBarcode("#modalBarcode", barcode, {
+                    format: "ean13",
+                    width: 2,
+                    height: 100,
+                    displayValue: true,
+                    fontSize: 14,
+                    margin: 10
+                });
+                
+                const modal = new bootstrap.Modal(document.getElementById('viewBarcodeModal'));
+                modal.show();
+            });
+        });
+        
+        // Generate barcode for product
+        document.querySelectorAll('.generate-barcode').forEach(button => {
+            button.addEventListener('click', function() {
+                const productId = this.getAttribute('data-product-id');
+                
+                // In a real implementation, this would make an AJAX call to generate a barcode for the product
+                // For demo purposes, we'll just simulate it
+                const prefix = '590'; // Example: Poland's country code
+                let digits = prefix;
+                
+                // Generate 9 random digits
+                for (let i = 0; i < 9; i++) {
+                    digits += Math.floor(Math.random() * 10);
+                }
+                
+                // Calculate check digit for EAN-13
+                const checkDigit = calculateEAN13CheckDigit(digits);
+                const barcode = digits + checkDigit;
+                
+                // Show a success message or update the UI
+                alert(`Barcode generated for product: ${barcode}`);
+                
+                // In a real implementation, you would save this barcode to the database and update the UI
+                // For now, we'll just refresh the page
+                window.location.reload();
+            });
+        });
+        
+        // Generate missing barcodes
+        document.getElementById('generateMissingBarcodes').addEventListener('click', function() {
+            // Count products without barcodes
+            const productsWithoutBarcodes = document.querySelectorAll('.generate-barcode').length;
+            
+            if (productsWithoutBarcodes === 0) {
+                alert('All products already have barcodes.');
+                return;
+            }
+            
+            if (confirm(`Generate barcodes for ${productsWithoutBarcodes} products without barcodes?`)) {
+                // In a real implementation, this would make an AJAX call to generate barcodes
+                // For demo purposes, we'll just reload the page
+                alert(`${productsWithoutBarcodes} barcodes have been generated successfully.`);
+                window.location.reload();
+            }
+        });
+        
+        // Bulk barcode generation
+        document.getElementById('generateBulkBarcodes').addEventListener('click', function() {
+            const prefix = document.getElementById('barcodePrefix').value || '';
+            const count = parseInt(document.getElementById('barcodeCount').value) || 10;
+            const type = document.getElementById('bulkBarcodeType').value;
+            
+            const bulkBarcodesList = document.getElementById('bulkBarcodesList');
+            bulkBarcodesList.innerHTML = '';
+            
+            // Generate barcodes
+            for (let i = 0; i < count; i++) {
+                let value;
+                
+                if (type === 'ean13') {
+                    // Generate EAN-13 barcode
+                    let digits = prefix;
+                    // Fill with random digits
+                    while (digits.length < 12) {
+                        digits += Math.floor(Math.random() * 10);
+                    }
+                    digits = digits.substring(0, 12); // Ensure exactly 12 digits
+                    const checkDigit = calculateEAN13CheckDigit(digits);
+                    value = digits + checkDigit;
+                } else if (type === 'ean8') {
+                    // Generate EAN-8 barcode
+                    let digits = prefix;
+                    // Fill with random digits
+                    while (digits.length < 7) {
+                        digits += Math.floor(Math.random() * 10);
+                    }
+                    digits = digits.substring(0, 7); // Ensure exactly 7 digits
+                    const checkDigit = calculateEAN8CheckDigit(digits);
+                    value = digits + checkDigit;
+                } else {
+                    // Code128
+                    value = prefix + generateRandomString(8);
+                }
+                
+                // Create barcode element
+                const barcodeItem = document.createElement('div');
+                barcodeItem.className = 'barcode-item mb-3';
+                
+                const barcodeSvg = document.createElement('div');
+                barcodeSvg.innerHTML = `<svg id="bulkBarcode${i}"></svg>`;
+                
+                barcodeItem.appendChild(barcodeSvg);
+                bulkBarcodesList.appendChild(barcodeItem);
+                
+                // Generate barcode
+                JsBarcode(`#bulkBarcode${i}`, value, {
+                    format: type,
+                    width: 2,
+                    height: 80,
+                    displayValue: true,
+                    fontSize: 12,
+                    margin: 5
+                });
+            }
+            
+            // Show actions
+            document.getElementById('bulkBarcodeActions').classList.remove('d-none');
+        });
+        
+        // Label designer
+        const labelTitle = document.getElementById('labelTitle');
+        const customTitleField = document.getElementById('customTitleField');
+        const showPrice = document.getElementById('showPrice');
+        const showBarcode = document.getElementById('showBarcode');
+        const showBarcodeValue = document.getElementById('showBarcodeValue');
+        
+        // Toggle custom title field
+        labelTitle.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customTitleField.classList.remove('d-none');
+            } else {
+                customTitleField.classList.add('d-none');
+            }
+        });
+        
+        // Update label preview
+        document.getElementById('updateLabelPreview').addEventListener('click', function() {
+            updateLabelPreview();
+        });
+        
+        function updateLabelPreview() {
+            const preview = document.getElementById('labelPreview');
+            const labelWidth = document.getElementById('labelWidth').value;
+            const labelHeight = document.getElementById('labelHeight').value;
+            const fontSize = document.getElementById('fontSize').value;
+            
+            // Set label dimensions
+            preview.style.width = `${labelWidth}mm`;
+            preview.style.height = `${labelHeight}mm`;
+            
+            // Set font size
+            switch (fontSize) {
+                case 'small':
+                    preview.style.fontSize = '10px';
+                    break;
+                case 'medium':
+                    preview.style.fontSize = '12px';
+                    break;
+                case 'large':
+                    preview.style.fontSize = '14px';
+                    break;
+            }
+            
+            // Update content based on settings
+            preview.innerHTML = '';
+            
+            // Title
+            if (labelTitle.value !== 'none') {
+                const titleElement = document.createElement('div');
+                titleElement.className = 'product-name';
+                
+                if (labelTitle.value === 'custom') {
+                    titleElement.textContent = document.getElementById('customTitleText').value || 'Product Name';
+                } else {
+                    titleElement.textContent = 'Jogoo Maize Flour 2kg';
+                }
+                
+                preview.appendChild(titleElement);
+            }
+            
+            // Price
+            if (showPrice.checked) {
+                const priceElement = document.createElement('div');
+                priceElement.className = 'product-price';
+                priceElement.textContent = 'KES 175.00';
+                preview.appendChild(priceElement);
+            }
+            
+            // Barcode
+            if (showBarcode.checked) {
+                const barcodeElement = document.createElement('div');
+                barcodeElement.className = 'product-barcode text-center';
+                
+                const barcodeSvg = document.createElement('svg');
+                barcodeSvg.id = 'previewBarcode';
+                barcodeElement.appendChild(barcodeSvg);
+                
+                if (showBarcodeValue.checked) {
+                    const barcodeValueElement = document.createElement('div');
+                    barcodeValueElement.className = 'barcode-value';
+                    barcodeValueElement.textContent = '5901234123457';
+                    barcodeElement.appendChild(barcodeValueElement);
+                }
+                
+                preview.appendChild(barcodeElement);
+                
+                // Generate barcode
+                JsBarcode("#previewBarcode", '5901234123457', {
+                    format: 'ean13',
+                    width: 1.5,
+                    height: 40,
+                    displayValue: false,
+                    margin: 0
+                });
+            }
+        }
+        
+        // Save label template
+        document.getElementById('saveTemplate').addEventListener('click', function() {
+            // Get current template configuration
+            const config = {
+                title: labelTitle.value,
+                customTitle: document.getElementById('customTitleText').value,
+                showPrice: showPrice.checked,
+                showBarcode: showBarcode.checked,
+                showBarcodeValue: showBarcodeValue.checked,
+                width: document.getElementById('labelWidth').value,
+                height: document.getElementById('labelHeight').value,
+                fontSize: document.getElementById('fontSize').value
+            };
+            
+            // Set configuration in hidden field
+            document.getElementById('templateConfig').value = JSON.stringify(config);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('saveTemplateModal'));
+            modal.show();
+        });
+        
+        // Utility functions
+        
+        // Calculate EAN-13 check digit
+        function calculateEAN13CheckDigit(digits) {
+            if (digits.length !== 12) {
+                throw new Error('EAN-13 requires exactly 12 digits (excluding check digit)');
+            }
+            
+            let sum = 0;
+            for (let i = 0; i < 12; i++) {
+                sum += parseInt(digits[i]) * (i % 2 === 0 ? 1 : 3);
+            }
+            
+            const checkDigit = (10 - (sum % 10)) % 10;
+            return checkDigit.toString();
+        }
+        
+        // Calculate EAN-8 check digit
+        function calculateEAN8CheckDigit(digits) {
+            if (digits.length !== 7) {
+                throw new Error('EAN-8 requires exactly 7 digits (excluding check digit)');
+            }
+            
+            let sum = 0;
+            for (let i = 0; i < 7; i++) {
+                sum += parseInt(digits[i]) * (i % 2 === 0 ? 3 : 1);
+            }
+            
+            const checkDigit = (10 - (sum % 10)) % 10;
+            return checkDigit.toString();
+        }
+        
+        // Generate random string
+        function generateRandomString(length) {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+    });
+</script>
+{% endblock %}

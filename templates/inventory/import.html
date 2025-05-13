@@ -1,0 +1,378 @@
+{% extends 'base.html' %}
+
+{% block title %}Bulk Import Products - Kenyan Cloud POS{% endblock %}
+
+{% block extra_css %}
+<style>
+    .custom-file-label::after {
+        content: "Browse";
+    }
+    .sample-csv {
+        max-height: 200px;
+        overflow-y: auto;
+        font-size: 0.85rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-file-import me-2"></i>Bulk Import Products</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">Import multiple products at once using a CSV or Excel file.</p>
+                    
+                    {% if error %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i> {{ error }}
+                    </div>
+                    {% endif %}
+                    
+                    {% if success %}
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle me-2"></i> {{ success }}
+                    </div>
+                    {% endif %}
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        <div class="mb-4">
+                            <h5>Upload File</h5>
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="fileUpload" class="form-label">Select CSV or Excel File</label>
+                                        <input type="file" class="form-control" id="fileUpload" name="file" 
+                                               accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
+                                        <div class="form-text">Supported formats: CSV, Excel (.xlsx, .xls)</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="headerRow" class="form-label">Header Row</label>
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="headerRow" name="header_row" checked>
+                                            <label class="form-check-label" for="headerRow">File contains header row</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>Column Mapping</h5>
+                            <p>Map the columns in your file to product fields. Select "Skip" for columns you don't want to import.</p>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnName" class="form-label">Name <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="columnName" name="column_name" required>
+                                        <option value="" selected disabled>-- Select Column --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnDescription" class="form-label">Description</label>
+                                    <select class="form-select" id="columnDescription" name="column_description">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnSKU" class="form-label">SKU</label>
+                                    <select class="form-select" id="columnSKU" name="column_sku">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnBarcode" class="form-label">Barcode</label>
+                                    <select class="form-select" id="columnBarcode" name="column_barcode">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnSellingPrice" class="form-label">Selling Price <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="columnSellingPrice" name="column_selling_price" required>
+                                        <option value="" selected disabled>-- Select Column --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnCostPrice" class="form-label">Cost Price</label>
+                                    <select class="form-select" id="columnCostPrice" name="column_cost_price">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnTaxRate" class="form-label">Tax Rate (%)</label>
+                                    <select class="form-select" id="columnTaxRate" name="column_tax_rate">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnCategory" class="form-label">Category</label>
+                                    <select class="form-select" id="columnCategory" name="column_category">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="columnQuantity" class="form-label">Initial Quantity</label>
+                                    <select class="form-select" id="columnQuantity" name="column_quantity">
+                                        <option value="" selected>-- Skip --</option>
+                                        <option value="0">Column A</option>
+                                        <option value="1">Column B</option>
+                                        <option value="2">Column C</option>
+                                        <option value="3">Column D</option>
+                                        <option value="4">Column E</option>
+                                        <option value="5">Column F</option>
+                                        <option value="6">Column G</option>
+                                        <option value="7">Column H</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>Default Values</h5>
+                            <p>Set default values for fields that are not included in your import file.</p>
+                            
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="defaultCategoryId" class="form-label">Default Category</label>
+                                    <select class="form-select" id="defaultCategoryId" name="default_category_id">
+                                        <option value="" selected disabled>-- Select Category --</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="defaultTaxRate" class="form-label">Default Tax Rate (%)</label>
+                                    <input type="number" class="form-control" id="defaultTaxRate" name="default_tax_rate" 
+                                           value="16" step="0.01" min="0">
+                                    <div class="form-text">Standard KRA VAT rate is 16%</div>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="defaultSupplierId" class="form-label">Default Supplier</label>
+                                    <select class="form-select" id="defaultSupplierId" name="default_supplier_id">
+                                        <option value="" selected disabled>-- Select Supplier --</option>
+                                        {% for supplier in suppliers %}
+                                        <option value="{{ supplier.id }}">{{ supplier.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="defaultQuantity" class="form-label">Default Initial Quantity</label>
+                                    <input type="number" class="form-control" id="defaultQuantity" name="default_quantity" 
+                                           value="0" min="0">
+                                </div>
+                                
+                                <div class="col-md-4 mb-3">
+                                    <label for="defaultReorderLevel" class="form-label">Default Reorder Level</label>
+                                    <input type="number" class="form-control" id="defaultReorderLevel" name="default_reorder_level" 
+                                           value="5" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>Sample Template</h5>
+                            <p>Download our sample template or view the expected format:</p>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <a href="{{ url_for('download_product_template') }}" class="btn btn-outline-primary">
+                                        <i class="fas fa-download me-2"></i> Download CSV Template
+                                    </a>
+                                </div>
+                            </div>
+                            
+                            <div class="card">
+                                <div class="card-body p-2 sample-csv">
+                                    <pre class="mb-0"><code>Name,Description,SKU,Barcode,Selling Price,Cost Price,Tax Rate,Category,Quantity
+Jogoo Maize Flour 2kg,Popular maize flour,SKU001,5901234123457,175.00,145.00,16,Groceries,50
+Mumias Sugar 1kg,Fine granulated sugar,SKU002,5901234123458,130.00,110.00,16,Groceries,40
+Dettol Soap 175g,Antibacterial soap,SKU003,5901234123459,90.00,70.00,16,Personal Care,30</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <a href="{{ url_for('inventory') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-1"></i> Back to Inventory
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-import me-1"></i> Import Products
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const fileUpload = document.getElementById('fileUpload');
+        const headerRow = document.getElementById('headerRow');
+        const columnSelects = document.querySelectorAll('select[id^="column"]');
+        
+        // Enable column mapping when file is selected
+        fileUpload.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                // Enable column mapping selects
+                columnSelects.forEach(select => {
+                    select.disabled = false;
+                });
+                
+                // Parse file to detect columns if it's a CSV
+                if (this.files[0].name.toLowerCase().endsWith('.csv')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const contents = e.target.result;
+                        const lines = contents.split('\n');
+                        
+                        if (lines.length > 0) {
+                            const firstLine = lines[0];
+                            const columns = firstLine.split(',');
+                            
+                            if (headerRow.checked && columns.length > 0) {
+                                // Update column options to show actual column names
+                                columnSelects.forEach(select => {
+                                    // Clear all options except first (skip)
+                                    while (select.options.length > 1) {
+                                        select.remove(1);
+                                    }
+                                    
+                                    // Add options for each column
+                                    columns.forEach((col, index) => {
+                                        const option = document.createElement('option');
+                                        option.value = index;
+                                        option.textContent = col.trim() || `Column ${index + 1}`;
+                                        select.appendChild(option);
+                                    });
+                                });
+                                
+                                // Try to auto-map common column names
+                                autoMapColumns(columns);
+                            }
+                        }
+                    };
+                    reader.readAsText(this.files[0]);
+                }
+            }
+        });
+        
+        // Function to try auto-mapping based on column names
+        function autoMapColumns(columns) {
+            const commonMappings = {
+                'name': ['name', 'product', 'product name', 'item', 'item name'],
+                'description': ['description', 'desc', 'details'],
+                'sku': ['sku', 'product code', 'code', 'item code'],
+                'barcode': ['barcode', 'ean', 'upc', 'gtin'],
+                'selling_price': ['selling price', 'price', 'retail price', 'sales price'],
+                'cost_price': ['cost price', 'cost', 'buying price', 'purchase price'],
+                'tax_rate': ['tax rate', 'tax', 'vat', 'vat rate'],
+                'category': ['category', 'group', 'department', 'product category'],
+                'quantity': ['quantity', 'qty', 'stock', 'initial quantity', 'opening stock']
+            };
+            
+            columns.forEach((column, index) => {
+                const columnLower = column.toLowerCase().trim();
+                
+                for (const [field, patterns] of Object.entries(commonMappings)) {
+                    if (patterns.includes(columnLower)) {
+                        const selectElement = document.getElementById(`column${field.charAt(0).toUpperCase() + field.slice(1)}`);
+                        if (selectElement) {
+                            selectElement.value = index.toString();
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Function to generate preview of mapping
+        function generatePreview() {
+            // Future enhancement: Show preview of how data will be mapped
+        }
+    });
+</script>
+{% endblock %}

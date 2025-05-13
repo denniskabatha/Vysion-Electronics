@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block title %}Server Error - Kenyan Cloud POS{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 text-center py-5">
+            <h1 class="display-1 text-danger">500</h1>
+            <h2 class="mb-4">Server Error</h2>
+            <p class="lead mb-4">Sorry, something went wrong on our server. We're working to fix the issue as soon as possible.</p>
+            <a href="{{ url_for('home') }}" class="btn btn-primary">
+                <i class="fas fa-home me-2"></i> Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
