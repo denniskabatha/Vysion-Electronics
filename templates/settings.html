@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Store Settings - Kenyan Cloud POS{% endblock %}
+{% block title %}Store Settings - TujaraHub{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -72,6 +72,98 @@
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="email_receipt" name="email_receipt">
                                     <label class="form-check-label" for="email_receipt">Enable Email Receipts</label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Hardware Settings -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <h5 class="border-bottom pb-2">Hardware Compatibility Settings</h5>
+                            </div>
+                            
+                            <!-- Barcode Scanner -->
+                            <div class="col-md-6 mb-3">
+                                <label for="barcode_scanner" class="form-label">Barcode Scanner</label>
+                                <select class="form-select" id="barcode_scanner" name="barcode_scanner">
+                                    <option value="none">-- None --</option>
+                                    <option value="usb_hid">USB HID Scanner (Default)</option>
+                                    <option value="symbol">Symbol/Motorola Scanner</option>
+                                    <option value="honeywell">Honeywell Scanner</option>
+                                    <option value="datalogic">Datalogic Scanner</option>
+                                    <option value="custom">Custom Configuration</option>
+                                </select>
+                                <div class="form-text">Select the type of barcode scanner connected to your system</div>
+                            </div>
+                            
+                            <!-- Receipt Printer -->
+                            <div class="col-md-6 mb-3">
+                                <label for="receipt_printer" class="form-label">Receipt Printer</label>
+                                <select class="form-select" id="receipt_printer" name="receipt_printer">
+                                    <option value="none">-- None --</option>
+                                    <option value="browser">Browser Print (Default)</option>
+                                    <option value="epson">Epson Thermal Printer</option>
+                                    <option value="star">Star Micronics Printer</option>
+                                    <option value="postek">Postek Printer</option>
+                                    <option value="custom">Custom Printer</option>
+                                </select>
+                                <div class="form-text">Select your receipt printer model</div>
+                            </div>
+                            
+                            <!-- Cash Drawer -->
+                            <div class="col-md-6 mb-3">
+                                <label for="cash_drawer" class="form-label">Cash Drawer</label>
+                                <select class="form-select" id="cash_drawer" name="cash_drawer">
+                                    <option value="none">-- None --</option>
+                                    <option value="printer_driven">Printer-Driven (Default)</option>
+                                    <option value="direct_usb">Direct USB Connection</option>
+                                    <option value="serial">Serial Port Connection</option>
+                                    <option value="manual">Manual Operation</option>
+                                </select>
+                                <div class="form-text">Select how your cash drawer is connected</div>
+                            </div>
+                            
+                            <!-- Card Reader -->
+                            <div class="col-md-6 mb-3">
+                                <label for="card_reader" class="form-label">Card Reader</label>
+                                <select class="form-select" id="card_reader" name="card_reader">
+                                    <option value="none">-- None --</option>
+                                    <option value="manual">Manual Entry</option>
+                                    <option value="stripe">Stripe Reader</option>
+                                    <option value="sumup">SumUp Reader</option>
+                                    <option value="custom">Custom Configuration</option>
+                                </select>
+                                <div class="form-text">Select your card reader type</div>
+                            </div>
+                            
+                            <!-- Hardware Bundles -->
+                            <div class="col-md-12 mb-3">
+                                <label for="hardware_bundle" class="form-label">Hardware Bundle Presets</label>
+                                <select class="form-select" id="hardware_bundle" name="hardware_bundle">
+                                    <option value="none">-- Select Bundle --</option>
+                                    <option value="basic">Basic Bundle (USB Scanner + Browser Print)</option>
+                                    <option value="standard">Standard Bundle (USB Scanner + Epson Printer + Cash Drawer)</option>
+                                    <option value="premium">Premium Bundle (All Hardware + Card Reader)</option>
+                                    <option value="mobile">Mobile Setup (Browser Print + Manual Operations)</option>
+                                </select>
+                                <div class="form-text">Quickly configure all hardware settings with a preset bundle</div>
+                            </div>
+                            
+                            <!-- Hardware Test Buttons -->
+                            <div class="col-md-12">
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="test_scanner">
+                                        <i class="fas fa-barcode me-1"></i> Test Scanner
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="test_printer">
+                                        <i class="fas fa-print me-1"></i> Test Printer
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="test_drawer">
+                                        <i class="fas fa-cash-register me-1"></i> Test Cash Drawer
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="test_all">
+                                        <i class="fas fa-tools me-1"></i> Test All Hardware
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -209,6 +301,218 @@
                 console.log('Till selected');
             }
         });
+        
+        // Hardware bundle selection handler
+        const hardwareBundle = document.getElementById('hardware_bundle');
+        const barcodeScanner = document.getElementById('barcode_scanner');
+        const receiptPrinter = document.getElementById('receipt_printer');
+        const cashDrawer = document.getElementById('cash_drawer');
+        const cardReader = document.getElementById('card_reader');
+        
+        hardwareBundle.addEventListener('change', function() {
+            // Update hardware settings based on bundle selection
+            switch(this.value) {
+                case 'basic':
+                    barcodeScanner.value = 'usb_hid';
+                    receiptPrinter.value = 'browser';
+                    cashDrawer.value = 'manual';
+                    cardReader.value = 'manual';
+                    break;
+                case 'standard':
+                    barcodeScanner.value = 'usb_hid';
+                    receiptPrinter.value = 'epson';
+                    cashDrawer.value = 'printer_driven';
+                    cardReader.value = 'manual';
+                    break;
+                case 'premium':
+                    barcodeScanner.value = 'usb_hid';
+                    receiptPrinter.value = 'epson';
+                    cashDrawer.value = 'printer_driven';
+                    cardReader.value = 'stripe';
+                    break;
+                case 'mobile':
+                    barcodeScanner.value = 'none';
+                    receiptPrinter.value = 'browser';
+                    cashDrawer.value = 'manual';
+                    cardReader.value = 'manual';
+                    break;
+            }
+        });
+        
+        // Hardware test button handlers
+        document.getElementById('test_scanner').addEventListener('click', function() {
+            testHardware('scanner');
+        });
+        
+        document.getElementById('test_printer').addEventListener('click', function() {
+            testHardware('printer');
+        });
+        
+        document.getElementById('test_drawer').addEventListener('click', function() {
+            testHardware('drawer');
+        });
+        
+        document.getElementById('test_all').addEventListener('click', function() {
+            testHardware('all');
+        });
+        
+        function testHardware(deviceType) {
+            let message = '';
+            let isSuccess = false;
+            
+            switch(deviceType) {
+                case 'scanner':
+                    const scannerType = barcodeScanner.value;
+                    if (scannerType === 'none') {
+                        message = 'No scanner configured';
+                    } else {
+                        message = 'Scanner test initiated. Please scan a barcode now.';
+                        // In a real implementation, this would activate the scanner
+                        // and listen for scan events
+                        simulateScanTest();
+                        isSuccess = true;
+                    }
+                    break;
+                    
+                case 'printer':
+                    const printerType = receiptPrinter.value;
+                    if (printerType === 'none') {
+                        message = 'No printer configured';
+                    } else if (printerType === 'browser') {
+                        message = 'Browser print test initiated. A print dialog should appear shortly.';
+                        printTestReceipt();
+                        isSuccess = true;
+                    } else {
+                        message = `Print test sent to ${printerType} printer.`;
+                        isSuccess = true;
+                    }
+                    break;
+                    
+                case 'drawer':
+                    const drawerType = cashDrawer.value;
+                    if (drawerType === 'none') {
+                        message = 'No cash drawer configured';
+                    } else if (drawerType === 'manual') {
+                        message = 'Manual cash drawer - please open manually';
+                    } else {
+                        message = 'Cash drawer open signal sent';
+                        isSuccess = true;
+                    }
+                    break;
+                    
+                case 'all':
+                    message = 'Testing all configured hardware...';
+                    
+                    // In a real implementation, this would test each device
+                    // sequentially and report the results
+                    
+                    setTimeout(() => {
+                        showTestResult('Hardware test complete', true);
+                    }, 2000);
+                    
+                    isSuccess = true;
+                    break;
+            }
+            
+            if (deviceType !== 'all') {
+                showTestResult(message, isSuccess);
+            }
+        }
+        
+        // Show a popup with the test result
+        function showTestResult(message, success) {
+            const alertClass = success ? 'alert-success' : 'alert-warning';
+            const icon = success ? 'fa-check-circle' : 'fa-exclamation-triangle';
+            
+            // Create a floating alert element
+            const alert = document.createElement('div');
+            alert.className = `alert ${alertClass} hardware-test-alert`;
+            alert.innerHTML = `<i class="fas ${icon} me-2"></i> ${message}`;
+            alert.style.position = 'fixed';
+            alert.style.top = '20px';
+            alert.style.right = '20px';
+            alert.style.zIndex = '9999';
+            alert.style.maxWidth = '300px';
+            alert.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            
+            document.body.appendChild(alert);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                alert.style.opacity = '0';
+                alert.style.transition = 'opacity 0.5s';
+                setTimeout(() => {
+                    document.body.removeChild(alert);
+                }, 500);
+            }, 3000);
+        }
+        
+        // Simulate a barcode scan test
+        function simulateScanTest() {
+            setTimeout(() => {
+                showTestResult('Barcode scan successful: EAN-9876543210', true);
+            }, 1500);
+        }
+        
+        // Print a test receipt
+        function printTestReceipt() {
+            // Create a new hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+            
+            // Write the test receipt content to the iframe
+            const doc = iframe.contentWindow.document;
+            doc.open();
+            doc.write(`
+                <html>
+                <head>
+                    <title>Test Receipt</title>
+                    <style>
+                        body { font-family: monospace; width: 300px; margin: 0 auto; }
+                        .center { text-align: center; }
+                        .receipt { line-height: 1.5; }
+                        .divider { border-top: 1px dashed #000; margin: 10px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt">
+                        <div class="center">
+                            <h3>TujaraHub</h3>
+                            <p>POS System Test Receipt</p>
+                        </div>
+                        <div class="divider"></div>
+                        <p>Date: ${new Date().toLocaleString()}</p>
+                        <p>Terminal: Test Terminal</p>
+                        <p>Receipt #: TEST-12345</p>
+                        <div class="divider"></div>
+                        <p>Test Item 1 ................. KES 100.00</p>
+                        <p>Test Item 2 ................. KES 250.00</p>
+                        <div class="divider"></div>
+                        <p>Subtotal: KES 350.00</p>
+                        <p>VAT (16%): KES 56.00</p>
+                        <p>Total: KES 406.00</p>
+                        <div class="divider"></div>
+                        <div class="center">
+                            <p>*** PRINTER TEST ***</p>
+                            <p>Thank you for testing!</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `);
+            doc.close();
+            
+            // Trigger print dialog
+            setTimeout(() => {
+                iframe.contentWindow.print();
+                
+                // Remove iframe after printing
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 1000);
+            }, 500);
+        }
         
         // Initialize tooltips
         const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));

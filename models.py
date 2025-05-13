@@ -307,3 +307,95 @@ class LabelTemplate(db.Model):
     
     def __repr__(self):
         return f"<LabelTemplate {self.name}>"
+
+
+class HardwareConfiguration(db.Model):
+    """
+    Model for storing hardware configurations for POS peripherals.
+    This model allows storing configuration for barcode scanners, receipt printers,
+    cash drawers, card readers, and other hardware compatible with the POS system.
+    """
+    id = db.Column(db.Integer, primary_key=True)
+    store_id = db.Column(db.Integer, db.ForeignKey('store.id'), nullable=False)
+    
+    # Hardware types
+    barcode_scanner_type = db.Column(db.String(50), default='usb_hid')
+    receipt_printer_type = db.Column(db.String(50), default='browser')
+    cash_drawer_type = db.Column(db.String(50), default='manual')
+    card_reader_type = db.Column(db.String(50), default='manual')
+    
+    # Communication settings
+    scanner_port = db.Column(db.String(50), default='USB')
+    printer_port = db.Column(db.String(50), default='USB')
+    drawer_port = db.Column(db.String(50), default='PRINTER')
+    
+    # JSON configuration for hardware-specific parameters
+    scanner_config = db.Column(db.Text, default='{}')  # JSON configuration for scanner
+    printer_config = db.Column(db.Text, default='{}')  # JSON configuration for printer
+    drawer_config = db.Column(db.Text, default='{}')   # JSON configuration for cash drawer
+    card_reader_config = db.Column(db.Text, default='{}')   # JSON configuration for card reader
+    
+    # Test and calibration status
+    is_scanner_active = db.Column(db.Boolean, default=True)
+    is_printer_active = db.Column(db.Boolean, default=True)
+    is_drawer_active = db.Column(db.Boolean, default=True)
+    is_card_reader_active = db.Column(db.Boolean, default=True)
+    
+    # Last test and calibration times
+    scanner_last_test = db.Column(db.DateTime)
+    printer_last_test = db.Column(db.DateTime)
+    drawer_last_test = db.Column(db.DateTime)
+    card_reader_last_test = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship
+    store = db.relationship('Store', backref='hardware_configurations')
+    
+    @property
+    def scanner_config_dict(self):
+        """Return the scanner config as a dictionary."""
+        if self.scanner_config:
+            return json.loads(self.scanner_config)
+        return {}
+    
+    @property
+    def printer_config_dict(self):
+        """Return the printer config as a dictionary."""
+        if self.printer_config:
+            return json.loads(self.printer_config)
+        return {}
+    
+    @property
+    def drawer_config_dict(self):
+        """Return the cash drawer config as a dictionary."""
+        if self.drawer_config:
+            return json.loads(self.drawer_config)
+        return {}
+    
+    @property
+    def card_reader_config_dict(self):
+        """Return the card reader config as a dictionary."""
+        if self.card_reader_config:
+            return json.loads(self.card_reader_config)
+        return {}
+    
+    def set_scanner_config(self, config_dict):
+        """Set scanner configuration from a dict."""
+        self.scanner_config = json.dumps(config_dict)
+    
+    def set_printer_config(self, config_dict):
+        """Set printer configuration from a dict."""
+        self.printer_config = json.dumps(config_dict)
+    
+    def set_drawer_config(self, config_dict):
+        """Set cash drawer configuration from a dict."""
+        self.drawer_config = json.dumps(config_dict)
+    
+    def set_card_reader_config(self, config_dict):
+        """Set card reader configuration from a dict."""
+        self.card_reader_config = json.dumps(config_dict)
+    
+    def __repr__(self):
+        return f"<HardwareConfiguration {self.id} for Store {self.store_id}>"
