@@ -23,7 +23,7 @@ import time
 import uuid
 from datetime import datetime
 from io import BytesIO
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union, cast
 
 import qrcode
 import qrcode.constants
@@ -48,7 +48,7 @@ CERTIFICATE_PATH = "instance/etims_certificate.p12"
 class ETIMSError(Exception):
     """Exception raised for eTIMS-related errors."""
 
-    def __init__(self, message: str, status_code: int = None, response: str = None):
+    def __init__(self, message: str, status_code: Optional[int] = None, response: Optional[str] = None):
         self.message = message
         self.status_code = status_code
         self.response = response
@@ -66,6 +66,8 @@ def load_certificate(certificate_path: str, password: str) -> Tuple:
     Returns:
         Tuple of (private key, certificate, CA certificates)
     """
+    if not certificate_path or not password:
+        raise ETIMSError("Certificate path and password must be provided")
     try:
         with open(certificate_path, "rb") as f:
             p12_data = f.read()
@@ -140,17 +142,8 @@ def generate_invoice_qr_code(
             f"CU={device_id}"
         )
         
-        # Generate QR code
-        qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
-        )
-        qr.add_data(qr_data)
-        qr.make(fit=True)
-        
-        img = qr.make_image(fill_color="black", back_color="white")
+        # Generate QR code using simple approach
+        img = qrcode.make(qr_data)
         
         # Save to BytesIO object
         buffer = BytesIO()
@@ -170,7 +163,7 @@ def format_invoice_data(sale, store, products, tax_pin: str, device_id: str) -> 
     Args:
         sale: Sale model object
         store: Store model object
-        products: List of products in the sale
+        products: List of products in the sale (can be SaleItem objects or dict)
         tax_pin: KRA PIN number
         device_id: Control Unit Device ID
         
@@ -178,8 +171,16 @@ def format_invoice_data(sale, store, products, tax_pin: str, device_id: str) -> 
         Dictionary with formatted invoice data for eTIMS API
     """
     try:
-        invoice_date = sale.sale_date.strftime("%Y-%m-%d")
-        invoice_time = sale.sale_date.strftime("%H:%M:%S")
+        # Handle date formatting (handle both datetime and string dates)
+        if hasattr(sale, 'created_at') and sale.created_at:
+            sale_date = sale.created_at
+        elif hasattr(sale, 'sale_date') and sale.sale_date:
+            sale_date = sale.sale_date
+        else:
+            sale_date = datetime.now()
+        
+        invoice_date = sale_date.strftime("%Y-%m-%d")
+        invoice_time = sale_date.strftime("%H:%M:%S")
         
         # Basic invoice information
         invoice_data = {
@@ -189,25 +190,56 @@ def format_invoice_data(sale, store, products, tax_pin: str, device_id: str) -> 
             "invoiceTime": invoice_time,
             "sellerPINNumber": tax_pin,
             "deviceId": device_id,
-            "taxableAmount": sale.subtotal,
-            "totalTax": sale.tax_amount,
-            "totalInvoiceAmount": sale.total_amount,
+            "taxableAmount": float(sale.subtotal),
+            "totalTax": float(sale.tax_amount),
+            "totalInvoiceAmount": float(sale.total_amount),
             "items": []
         }
         
-        # Add items
-        for item in sale.items:
-            product_data = {
-                "itemCode": item.product.sku or f"PROD-{item.product.id}",
-                "itemName": item.product.name,
-                "quantity": item.quantity,
-                "unitPrice": item.unit_price,
-                "taxRate": item.tax_rate,
-                "taxAmount": (item.unit_price * item.quantity * item.tax_rate / 100),
-                "discountAmount": item.discount_amount,
-                "lineTotal": item.total_price
-            }
-            invoice_data["items"].append(product_data)
+        # Add items (handle both ORM objects and dictionaries)
+        if hasattr(sale, 'items') and sale.items:
+            # Handle ORM relationship
+            for item in sale.items:
+                product = item.product
+                product_data = {
+                    "itemCode": getattr(product, 'sku', None) or f"PROD-{getattr(product, 'id', 0)}",
+                    "itemName": getattr(product, 'name', 'Unknown Product'),
+                    "quantity": float(item.quantity),
+                    "unitPrice": float(item.unit_price),
+                    "taxRate": float(item.tax_rate) if hasattr(item, 'tax_rate') else 0,
+                    "taxAmount": float(item.unit_price * item.quantity * (item.tax_rate / 100)) if hasattr(item, 'tax_rate') else 0,
+                    "discountAmount": float(item.discount_amount) if hasattr(item, 'discount_amount') and item.discount_amount else 0,
+                    "lineTotal": float(item.total_price)
+                }
+                invoice_data["items"].append(product_data)
+        else:
+            # Handle list of products passed directly
+            for item in products:
+                if isinstance(item, dict):
+                    # Dictionary product
+                    product_data = {
+                        "itemCode": item.get('code', None) or f"PROD-{item.get('id', 0)}",
+                        "itemName": item.get('name', 'Unknown Product'),
+                        "quantity": float(item.get('quantity', 0)),
+                        "unitPrice": float(item.get('unit_price', 0)),
+                        "taxRate": float(item.get('tax_rate', 0)),
+                        "taxAmount": float(item.get('quantity', 0) * item.get('unit_price', 0) * item.get('tax_rate', 0) / 100),
+                        "discountAmount": float(item.get('discount_amount', 0)),
+                        "lineTotal": float(item.get('total_price', 0))
+                    }
+                else:
+                    # ORM product
+                    product_data = {
+                        "itemCode": getattr(item, 'sku', None) or f"PROD-{getattr(item, 'id', 0)}",
+                        "itemName": getattr(item, 'name', 'Unknown Product'),
+                        "quantity": float(getattr(item, 'quantity', 0)),
+                        "unitPrice": float(getattr(item, 'unit_price', 0)),
+                        "taxRate": float(getattr(item, 'tax_rate', 0)),
+                        "taxAmount": float(getattr(item, 'quantity', 0) * getattr(item, 'unit_price', 0) * getattr(item, 'tax_rate', 0) / 100),
+                        "discountAmount": float(getattr(item, 'discount_amount', 0) or 0),
+                        "lineTotal": float(getattr(item, 'total_price', 0))
+                    }
+                invoice_data["items"].append(product_data)
         
         return invoice_data
     except Exception as e:
@@ -217,7 +249,7 @@ def format_invoice_data(sale, store, products, tax_pin: str, device_id: str) -> 
 
 def transmit_invoice(
     invoice_data: Dict,
-    api_url: str,
+    api_url: Optional[str],
     private_key,
     certificate
 ) -> Dict:
@@ -233,8 +265,8 @@ def transmit_invoice(
     Returns:
         API response as dictionary
     """
-    if api_url is None:
-        raise ValueError("API URL cannot be None")
+    if not api_url:
+        raise ValueError("API URL cannot be None or empty")
     try:
         # Convert invoice data to JSON
         invoice_json = json.dumps(invoice_data)
@@ -353,7 +385,7 @@ def process_offline_queue(
                     # Attempt to transmit to eTIMS
                     response = transmit_invoice(
                         item["invoice_data"],
-                        api_url,
+                        cast(str, api_url),
                         private_key,
                         certificate
                     )
