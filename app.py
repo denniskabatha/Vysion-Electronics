@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
@@ -28,6 +29,46 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 # Configure database connection - using SQLite
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kenyan_pos.db"
+
+# Load KRA eTIMS settings if configuration file exists
+etims_config_file = os.path.join('instance', 'config.json')
+if os.path.exists(etims_config_file):
+    try:
+        with open(etims_config_file, 'r') as f:
+            etims_config = json.load(f)
+            
+        # Apply eTIMS configuration to app
+        app.config.update({
+            'ENABLE_TIMS': etims_config.get('ENABLE_TIMS', False),
+            'TAX_PIN': etims_config.get('TAX_PIN', ''),
+            'TIMS_DEVICE_ID': etims_config.get('TIMS_DEVICE_ID', ''),
+            'TIMS_CERT_SERIAL': etims_config.get('TIMS_CERT_SERIAL', ''),
+            'VAT_REGISTRATION_DATE': etims_config.get('VAT_REGISTRATION_DATE', ''),
+            'TIMS_URL': etims_config.get('TIMS_URL', 'https://etims.kra.go.ke/api/v1/'),
+            'ENABLE_QR_CODE': etims_config.get('ENABLE_QR_CODE', True),
+            'DEFAULT_TAX_RATE': etims_config.get('DEFAULT_TAX_RATE', 16.0)
+        })
+        
+        # Check for certificate file
+        cert_path = os.path.join('instance', 'etims_certificate.p12')
+        if os.path.exists(cert_path):
+            app.config['TIMS_CERTIFICATE_PATH'] = cert_path
+            
+        logging.info("KRA eTIMS configuration loaded successfully")
+    except Exception as e:
+        logging.error(f"Failed to load KRA eTIMS configuration: {str(e)}")
+else:
+    # Set default eTIMS configuration
+    app.config.update({
+        'ENABLE_TIMS': False,
+        'TAX_PIN': '',
+        'TIMS_DEVICE_ID': '',
+        'TIMS_CERT_SERIAL': '',
+        'VAT_REGISTRATION_DATE': '',
+        'TIMS_URL': 'https://etims.kra.go.ke/api/v1/',
+        'ENABLE_QR_CODE': True,
+        'DEFAULT_TAX_RATE': 16.0
+    })
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 # SQLite-specific options
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
