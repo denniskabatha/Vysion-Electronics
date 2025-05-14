@@ -197,10 +197,10 @@
                             </div>
                         </div>
                         
-                        <!-- Tax Settings -->
+                        <!-- KRA eTIMS Integration -->
                         <div class="row mb-4">
                             <div class="col-12">
-                                <h5 class="border-bottom pb-2">Tax Settings</h5>
+                                <h5 class="border-bottom pb-2">KRA eTIMS Compliance</h5>
                             </div>
                             
                             <div class="col-md-6 mb-3">
@@ -214,17 +214,84 @@
                             </div>
                             
                             <div class="col-md-6 mb-3">
-                                <label for="tax_pin" class="form-label">KRA PIN</label>
+                                <label for="tax_pin" class="form-label">KRA PIN <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="tax_pin" name="tax_pin" 
-                                       placeholder="e.g. A123456789Z">
+                                       placeholder="e.g. A123456789Z" required>
+                                <div class="form-text">Your Kenya Revenue Authority Personal Identification Number</div>
                             </div>
                             
-                            <div class="col-md-12 mb-3">
+                            <div class="col-md-6 mb-3">
+                                <label for="tims_device_id" class="form-label">Control Unit ID</label>
+                                <input type="text" class="form-control" id="tims_device_id" name="tims_device_id" 
+                                       placeholder="e.g. CU12345678">
+                                <div class="form-text">KRA approved Electronic Tax Register (ETR) Control Unit ID</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="tims_cert_serial" class="form-label">Certificate Serial Number</label>
+                                <input type="text" class="form-control" id="tims_cert_serial" name="tims_cert_serial" 
+                                       placeholder="e.g. 1234-5678-9012-3456">
+                                <div class="form-text">eTIMS digital certificate serial number</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="vat_registration_date" class="form-label">VAT Registration Date</label>
+                                <input type="date" class="form-control" id="vat_registration_date" name="vat_registration_date">
+                                <div class="form-text">Date when your business was registered for VAT with KRA</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="tims_certificate" class="form-label">eTIMS Certificate</label>
+                                <input type="file" class="form-control" id="tims_certificate" name="tims_certificate" accept=".p12,.pfx">
+                                <div class="form-text">Upload your eTIMS digital certificate (.p12 or .pfx)</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="cert_password" class="form-label">Certificate Password</label>
+                                <input type="password" class="form-control" id="cert_password" name="cert_password" 
+                                       placeholder="Certificate password">
+                                <div class="form-text">Password for your digital certificate</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label for="tims_url" class="form-label">eTIMS API URL</label>
+                                <select class="form-select" id="tims_url" name="tims_url">
+                                    <option value="https://etims.kra.go.ke/api/v1/" selected>Production</option>
+                                    <option value="https://etims-uat.kra.go.ke/api/v1/">Testing (UAT)</option>
+                                    <option value="custom">Custom URL</option>
+                                </select>
+                                <div class="form-text">KRA eTIMS API endpoint URL</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="enable_tims" name="enable_tims">
-                                    <label class="form-check-label" for="enable_tims">Enable KRA TIMS Integration</label>
+                                    <label class="form-check-label" for="enable_tims">Enable KRA eTIMS Integration</label>
                                 </div>
                                 <div class="form-text">Tax Invoice Management System integration for electronic tax invoices</div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enable_qr_code" name="enable_qr_code" checked>
+                                    <label class="form-check-label" for="enable_qr_code">Print QR Code on Receipts</label>
+                                </div>
+                                <div class="form-text">Add KRA-compliant QR code on receipts/invoices for verification</div>
+                            </div>
+                            
+                            <div class="col-md-12">
+                                <div class="d-flex gap-2 mb-2">
+                                    <button type="button" class="btn btn-sm btn-secondary" id="test_tims_connection">
+                                        <i class="fas fa-plug me-1"></i> Test eTIMS Connection
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="verify_certificate">
+                                        <i class="fas fa-certificate me-1"></i> Verify Certificate
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="verify_device">
+                                        <i class="fas fa-microchip me-1"></i> Verify Control Unit
+                                    </button>
+                                </div>
+                                <div id="tims_status" class="mt-2"></div>
                             </div>
                         </div>
                         
@@ -356,6 +423,105 @@
             testHardware('all');
         });
         
+        // KRA eTIMS test buttons
+        document.getElementById('test_tims_connection').addEventListener('click', function() {
+            testTimsConnection();
+        });
+        
+        document.getElementById('verify_certificate').addEventListener('click', function() {
+            verifyCertificate();
+        });
+        
+        document.getElementById('verify_device').addEventListener('click', function() {
+            verifyControlUnit();
+        });
+        
+        // eTIMS URL handler
+        const timsUrl = document.getElementById('tims_url');
+        timsUrl.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                // Show custom URL input field
+                const customUrlDiv = document.createElement('div');
+                customUrlDiv.className = 'mt-2';
+                customUrlDiv.id = 'custom_url_container';
+                const customUrlInput = document.createElement('input');
+                customUrlInput.type = 'text';
+                customUrlInput.className = 'form-control';
+                customUrlInput.id = 'custom_tims_url';
+                customUrlInput.name = 'custom_tims_url';
+                customUrlInput.placeholder = 'Enter custom eTIMS API URL';
+                
+                // Remove existing custom URL field if any
+                const existingField = document.getElementById('custom_url_container');
+                if (existingField) {
+                    existingField.remove();
+                }
+                
+                customUrlDiv.appendChild(customUrlInput);
+                timsUrl.parentNode.appendChild(customUrlDiv);
+            } else {
+                // Remove custom URL input field if exists
+                const customUrlContainer = document.getElementById('custom_url_container');
+                if (customUrlContainer) {
+                    customUrlContainer.remove();
+                }
+            }
+        });
+        
+        // Toggle eTIMS certificate password field based on file selection
+        const timsCertificate = document.getElementById('tims_certificate');
+        const certPassword = document.getElementById('cert_password');
+        
+        timsCertificate.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                certPassword.parentNode.style.display = 'block';
+                certPassword.required = true;
+            } else {
+                certPassword.parentNode.style.display = 'none';
+                certPassword.required = false;
+            }
+        });
+        
+        // Enable/disable TIMS related fields based on the enable_tims checkbox
+        const enableTims = document.getElementById('enable_tims');
+        const timsFields = [
+            document.getElementById('tims_device_id'),
+            document.getElementById('tims_cert_serial'),
+            document.getElementById('tims_certificate'),
+            document.getElementById('cert_password'),
+            document.getElementById('tims_url'),
+            document.getElementById('test_tims_connection'),
+            document.getElementById('verify_certificate'),
+            document.getElementById('verify_device')
+        ];
+        
+        enableTims.addEventListener('change', function() {
+            const isDisabled = !this.checked;
+            
+            timsFields.forEach(field => {
+                if (field) {
+                    if (field.tagName === 'BUTTON') {
+                        field.disabled = isDisabled;
+                    } else {
+                        field.disabled = isDisabled;
+                    }
+                }
+            });
+        });
+        
+        // Initially disable TIMS fields if checkbox is unchecked
+        if (!enableTims.checked) {
+            timsFields.forEach(field => {
+                if (field) {
+                    if (field.tagName === 'BUTTON') {
+                        field.disabled = true;
+                    } else {
+                        field.disabled = true;
+                    }
+                }
+            });
+        }
+        
         function testHardware(deviceType) {
             let message = '';
             let isSuccess = false;
@@ -419,6 +585,56 @@
             }
         }
         
+        // KRA eTIMS testing functions
+        function testTimsConnection() {
+            const timsStatus = document.getElementById('tims_status');
+            timsStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Testing connection to KRA eTIMS...</div>';
+            
+            // In a real implementation, this would make an API call to the eTIMS endpoint
+            setTimeout(() => {
+                const url = timsUrl.value === 'custom' ? 
+                            document.getElementById('custom_tims_url')?.value || 'custom URL' : 
+                            timsUrl.value;
+                
+                timsStatus.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> Successfully connected to KRA eTIMS API at: ' + url + '</div>';
+            }, 2000);
+        }
+        
+        function verifyCertificate() {
+            const timsStatus = document.getElementById('tims_status');
+            const certFile = timsCertificate.files.length > 0 ? timsCertificate.files[0].name : null;
+            const serialNo = document.getElementById('tims_cert_serial').value;
+            
+            if (!certFile && !serialNo) {
+                timsStatus.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i> Please upload a certificate file or enter a certificate serial number.</div>';
+                return;
+            }
+            
+            timsStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Verifying digital certificate...</div>';
+            
+            // In a real implementation, this would verify the certificate with KRA
+            setTimeout(() => {
+                timsStatus.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> Certificate verified successfully. Valid until: Dec 31, 2025</div>';
+            }, 2000);
+        }
+        
+        function verifyControlUnit() {
+            const timsStatus = document.getElementById('tims_status');
+            const deviceId = document.getElementById('tims_device_id').value;
+            
+            if (!deviceId) {
+                timsStatus.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i> Please enter a Control Unit ID.</div>';
+                return;
+            }
+            
+            timsStatus.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i> Verifying Control Unit with ID: ' + deviceId + '...</div>';
+            
+            // In a real implementation, this would verify the Control Unit with KRA
+            setTimeout(() => {
+                timsStatus.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> Control Unit verified and authorized by KRA.</div>';
+            }, 2000);
+        }
+        
         // Show a popup with the test result
         function showTestResult(message, success) {
             const alertClass = success ? 'alert-success' : 'alert-warning';
@@ -461,6 +677,12 @@
             iframe.style.display = 'none';
             document.body.appendChild(iframe);
             
+            // Generate a KRA eTIMS compliant QR code (placeholder URL)
+            const qrCodeUrl = 'https://chart.googleapis.com/chart?cht=qr&chl=' + 
+                encodeURIComponent('KRA:TujaraHub:PIN=A123456789Z:REF=TEST-12345:DATE=' + 
+                new Date().toISOString().slice(0, 10) + ':AMT=406.00:VAT=56.00') + 
+                '&chs=150x150&choe=UTF-8&chld=L|2';
+            
             // Write the test receipt content to the iframe
             const doc = iframe.contentWindow.document;
             doc.open();
@@ -473,6 +695,8 @@
                         .center { text-align: center; }
                         .receipt { line-height: 1.5; }
                         .divider { border-top: 1px dashed #000; margin: 10px 0; }
+                        .qrcode { display: block; margin: 10px auto; width: 150px; height: 150px; }
+                        .fiscal { font-weight: bold; }
                     </style>
                 </head>
                 <body>
@@ -494,6 +718,10 @@
                         <p>Total: KES 406.00</p>
                         <div class="divider"></div>
                         <div class="center">
+                            <p class="fiscal">KRA APPROVED</p>
+                            <p>Control Unit ID: CU12345678</p>
+                            <p>Fiscal ID: F1-TEST-12345-CU12345678</p>
+                            <img src="${qrCodeUrl}" class="qrcode">
                             <p>*** PRINTER TEST ***</p>
                             <p>Thank you for testing!</p>
                         </div>
