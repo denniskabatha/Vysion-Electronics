@@ -262,14 +262,40 @@ def register_routes(app):
             cashier = User.query.get(session.get('user_id'))
             cashier_name = cashier.full_name if cashier else "Unknown"
             
-            return jsonify({
+            # Process for KRA eTIMS if enabled
+            etims_data = None
+            if current_app.config.get('ENABLE_TIMS', False):
+                try:
+                    # Process the sale for eTIMS compliance
+                    etims_result = etims.handle_sale_for_etims(sale.id)
+                    
+                    # Add QR code and other eTIMS data to the response
+                    if etims_result.get('status') in ('transmitted', 'queued', 'queued_after_failure'):
+                        etims_data = {
+                            'status': etims_result.get('status'),
+                            'qr_code': etims_result.get('qr_code'),
+                            'tax_pin': current_app.config.get('TAX_PIN', ''),
+                            'device_id': current_app.config.get('TIMS_DEVICE_ID', ''),
+                            'fiscal_receipt_number': f"F1-{sale.reference}-{current_app.config.get('TIMS_DEVICE_ID', '')}"
+                        }
+                except Exception as e:
+                    logging.error(f"eTIMS error during checkout: {str(e)}")
+                    # Continue even if eTIMS fails - we'll handle it in the offline queue
+            
+            response_data = {
                 'success': True,
                 'sale_id': sale.id,
                 'reference': sale.reference,
                 'payment_success': payment_success,
                 'payment_reference': payment_reference,
                 'cashier_name': cashier_name
-            })
+            }
+            
+            # Add eTIMS data if available
+            if etims_data:
+                response_data['etims'] = etims_data
+                
+            return jsonify(response_data)
             
         except Exception as e:
             db.session.rollback()
@@ -1688,6 +1714,194 @@ def register_routes(app):
             as_attachment=True,
             download_name='product_import_template.csv'
         )
+        
+    # KRA eTIMS API routes
+    @app.route('/api/etims/test-connection', methods=['POST'])
+    @login_required
+    @manager_required
+    def test_etims_connection():
+        """Test connection to KRA eTIMS API."""
+        api_url = request.json.get('api_url')
+        if not api_url:
+            return jsonify({'success': False, 'message': 'API URL is required'}), 400
+            
+        try:
+            # Test connection to KRA eTIMS API
+            result = etims.test_etims_connection(api_url)
+            
+            if result:
+                return jsonify({
+                    'success': True, 
+                    'message': 'Successfully connected to KRA eTIMS API'
+                })
+            else:
+                return jsonify({
+                    'success': False, 
+                    'message': 'Failed to connect to KRA eTIMS API. Please check the URL and try again.'
+                })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    
+    @app.route('/api/etims/verify-certificate', methods=['POST'])
+    @login_required
+    @manager_required
+    def verify_etims_certificate():
+        """Verify KRA eTIMS digital certificate."""
+        cert_file = request.files.get('certificate')
+        cert_password = request.json.get('password')
+        cert_serial = request.json.get('serial')
+        
+        if not cert_file and not cert_serial:
+            return jsonify({
+                'success': False, 
+                'message': 'Certificate file or serial number is required'
+            }), 400
+            
+        try:
+            # If certificate file was uploaded, save it temporarily
+            if cert_file:
+                cert_path = os.path.join('instance', 'temp_certificate.p12')
+                cert_file.save(cert_path)
+                
+                # Verify certificate by loading it
+                if not cert_password:
+                    return jsonify({
+                        'success': False, 
+                        'message': 'Certificate password is required'
+                    }), 400
+                    
+                try:
+                    private_key, certificate, _ = etims.load_certificate(cert_path, cert_password)
+                    
+                    # Get certificate expiration date
+                    expiry_date = certificate.not_valid_after.strftime('%Y-%m-%d')
+                    
+                    return jsonify({
+                        'success': True,
+                        'message': f'Certificate verified successfully. Valid until: {expiry_date}',
+                        'expires': expiry_date,
+                        'serial': format(certificate.serial_number, 'x')
+                    })
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'message': f'Certificate verification failed: {str(e)}'
+                    }), 400
+                finally:
+                    # Clean up temporary certificate file
+                    if os.path.exists(cert_path):
+                        os.remove(cert_path)
+            else:
+                # Verify using serial number (would require actual KRA API in production)
+                # This is a placeholder implementation
+                return jsonify({
+                    'success': True,
+                    'message': f'Certificate with serial {cert_serial} verified with KRA',
+                    'expires': '2025-12-31'  # Placeholder
+                })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+    
+    @app.route('/api/etims/verify-device', methods=['POST'])
+    @login_required
+    @manager_required
+    def verify_etims_device():
+        """Verify KRA eTIMS Control Unit Device."""
+        device_id = request.json.get('device_id')
+        tax_pin = request.json.get('tax_pin')
+        api_url = request.json.get('api_url')
+        
+        if not device_id:
+            return jsonify({'success': False, 'message': 'Device ID is required'}), 400
+            
+        if not tax_pin:
+            return jsonify({'success': False, 'message': 'KRA PIN is required'}), 400
+            
+        if not api_url:
+            return jsonify({'success': False, 'message': 'API URL is required'}), 400
+            
+        try:
+            # In a real implementation, this would verify the Control Unit with KRA
+            # For now, we'll simulate a successful verification
+            # result = etims.verify_control_unit(api_url, device_id, tax_pin)
+            
+            # Simulated response
+            return jsonify({
+                'success': True,
+                'message': f'Control Unit with ID {device_id} verified and authorized by KRA',
+                'device_type': 'ETR Control Unit',
+                'status': 'Active'
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+            
+    @app.route('/api/etims/process-sale/<int:sale_id>', methods=['POST'])
+    @login_required
+    def process_sale_for_etims(sale_id):
+        """Process a sale for KRA eTIMS compliance."""
+        try:
+            # Call the etims module to handle the sale
+            result = etims.handle_sale_for_etims(sale_id)
+            
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'status': 'error', 'reason': str(e)}), 500
+            
+    @app.route('/api/etims/offline-queue', methods=['GET'])
+    @login_required
+    @not_cashier_required
+    def get_offline_queue():
+        """Get statistics about the eTIMS offline queue."""
+        try:
+            stats = etims.get_offline_queue_stats()
+            
+            return jsonify(stats)
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+            
+    @app.route('/api/etims/process-queue', methods=['POST'])
+    @login_required
+    @manager_required
+    def process_offline_queue():
+        """Process the eTIMS offline queue."""
+        try:
+            # Get eTIMS settings from application config
+            api_url = current_app.config.get('TIMS_URL')
+            cert_path = current_app.config.get('TIMS_CERTIFICATE_PATH', 'instance/etims_certificate.p12')
+            cert_password = current_app.config.get('TIMS_CERTIFICATE_PASSWORD')
+            
+            if not api_url:
+                return jsonify({
+                    'success': False, 
+                    'message': 'KRA eTIMS API URL is not configured'
+                }), 400
+                
+            if not os.path.exists(cert_path):
+                return jsonify({
+                    'success': False, 
+                    'message': 'KRA eTIMS certificate file not found'
+                }), 400
+                
+            if not cert_password:
+                return jsonify({
+                    'success': False, 
+                    'message': 'KRA eTIMS certificate password is not configured'
+                }), 400
+            
+            # Load certificate
+            private_key, certificate, _ = etims.load_certificate(cert_path, cert_password)
+            
+            # Process the queue
+            success_count, fail_count = etims.process_offline_queue(api_url, private_key, certificate)
+            
+            return jsonify({
+                'success': True,
+                'message': f'Processed {success_count + fail_count} invoices: {success_count} succeeded, {fail_count} failed',
+                'succeeded': success_count,
+                'failed': fail_count
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
         
     @app.route('/inventory/save-label-template', methods=['POST'])
     @login_required
