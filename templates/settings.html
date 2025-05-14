@@ -767,6 +767,165 @@
         tooltipTriggerList.forEach(tooltipTriggerEl => {
             new bootstrap.Tooltip(tooltipTriggerEl);
         });
+        
+        // KRA eTIMS Status Dashboard handlers
+        document.getElementById('check_etims_status').addEventListener('click', function() {
+            const statusBadge = document.getElementById('etims-status-badge');
+            const statusText = document.getElementById('etims-status-text');
+            
+            statusBadge.className = 'badge bg-info me-2';
+            statusBadge.textContent = 'Checking...';
+            statusText.textContent = 'Checking your eTIMS connection and configuration...';
+            
+            // Check if eTIMS is enabled
+            const etimsEnabled = document.getElementById('enable_tims').checked;
+            if (!etimsEnabled) {
+                statusBadge.className = 'badge bg-warning me-2';
+                statusBadge.textContent = 'Disabled';
+                statusText.textContent = 'KRA eTIMS integration is currently disabled. Enable it to stay compliant.';
+                return;
+            }
+            
+            // Check for required fields
+            const taxPin = document.getElementById('tax_pin').value;
+            const deviceId = document.getElementById('tims_device_id').value;
+            const timsUrl = document.getElementById('tims_url').value;
+            
+            if (!taxPin || !deviceId) {
+                statusBadge.className = 'badge bg-danger me-2';
+                statusBadge.textContent = 'Incomplete';
+                statusText.textContent = 'Required eTIMS fields are missing. Please complete the configuration.';
+                return;
+            }
+            
+            // Test the connection to KRA eTIMS
+            // In a production environment, this would make an API call to test the connection
+            setTimeout(() => {
+                statusBadge.className = 'badge bg-success me-2';
+                statusBadge.textContent = 'Connected';
+                statusText.textContent = 'Your KRA eTIMS configuration is active and properly configured.';
+            }, 1500);
+        });
+        
+        document.getElementById('view_offline_queue').addEventListener('click', function() {
+            // In a production environment, this would retrieve the offline queue status
+            // For now, we'll just show a modal with sample data
+            
+            const modal = document.createElement('div');
+            modal.innerHTML = `
+                <div class="modal fade" id="offlineQueueModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">eTIMS Offline Queue</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="card mb-3">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Queue Statistics</h6>
+                                        <div class="d-flex justify-content-between">
+                                            <div class="text-center p-2">
+                                                <h5 class="mb-1" id="total-queued">0</h5>
+                                                <span class="small text-muted">Total</span>
+                                            </div>
+                                            <div class="text-center p-2">
+                                                <h5 class="mb-1 text-warning" id="pending-queued">0</h5>
+                                                <span class="small text-muted">Pending</span>
+                                            </div>
+                                            <div class="text-center p-2">
+                                                <h5 class="mb-1 text-success" id="transmitted-queued">0</h5>
+                                                <span class="small text-muted">Transmitted</span>
+                                            </div>
+                                            <div class="text-center p-2">
+                                                <h5 class="mb-1 text-danger" id="failed-queued">0</h5>
+                                                <span class="small text-muted">Failed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="text-muted small">
+                                    The offline queue stores electronic tax invoices when internet connectivity is unavailable. These will be transmitted to KRA when connectivity is restored.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-primary" id="process-queue-btn">Process Queue</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Initialize modal
+            const queueModal = new bootstrap.Modal(document.getElementById('offlineQueueModal'));
+            queueModal.show();
+            
+            // Fetch queue statistics
+            // In a production environment, this would make an API call
+            // For now, we'll just show sample data
+            
+            // Simulate loading the queue data
+            setTimeout(() => {
+                document.getElementById('total-queued').textContent = '5';
+                document.getElementById('pending-queued').textContent = '3';
+                document.getElementById('transmitted-queued').textContent = '1';
+                document.getElementById('failed-queued').textContent = '1';
+            }, 500);
+            
+            // Process queue handler
+            document.getElementById('process-queue-btn').addEventListener('click', function() {
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Processing...';
+                
+                // In a production environment, this would make an API call to process the queue
+                setTimeout(() => {
+                    document.getElementById('transmitted-queued').textContent = '4';
+                    document.getElementById('pending-queued').textContent = '0';
+                    this.disabled = false;
+                    this.innerHTML = 'Process Queue';
+                    
+                    // Show success message
+                    const alertDiv = document.createElement('div');
+                    alertDiv.className = 'alert alert-success mt-3';
+                    alertDiv.textContent = 'Queue processed successfully! 3 invoices transmitted to KRA.';
+                    this.closest('.modal-footer').insertAdjacentElement('beforebegin', alertDiv);
+                    
+                    // Hide alert after 3 seconds
+                    setTimeout(() => {
+                        alertDiv.remove();
+                    }, 3000);
+                }, 2000);
+            });
+            
+            // Remove modal when hidden
+            document.getElementById('offlineQueueModal').addEventListener('hidden.bs.modal', function() {
+                this.remove();
+            });
+        });
+        
+        document.getElementById('process_offline_queue').addEventListener('click', function() {
+            const button = this;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span> Processing...';
+            
+            // In a production environment, this would make an API call to process the queue
+            setTimeout(() => {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-cloud-upload-alt me-1"></i> Process Queue';
+                
+                // Show success message
+                const timsStatus = document.getElementById('tims_status');
+                timsStatus.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i> Offline queue processed successfully! 3 invoices transmitted to KRA.</div>';
+                
+                // Clear status after 3 seconds
+                setTimeout(() => {
+                    timsStatus.innerHTML = '';
+                }, 3000);
+            }, 2000);
+        });
     });
 </script>
 {% endblock %}

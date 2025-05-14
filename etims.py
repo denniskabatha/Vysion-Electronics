@@ -26,6 +26,7 @@ from io import BytesIO
 from typing import Dict, List, Optional, Tuple, Union
 
 import qrcode
+import qrcode.constants
 import requests
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -142,7 +143,7 @@ def generate_invoice_qr_code(
         # Generate QR code
         qr = qrcode.QRCode(
             version=1,
-            error_correction=qrcode.ERROR_CORRECT_L,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
             box_size=10,
             border=4,
         )
@@ -232,6 +233,8 @@ def transmit_invoice(
     Returns:
         API response as dictionary
     """
+    if api_url is None:
+        raise ValueError("API URL cannot be None")
     try:
         # Convert invoice data to JSON
         invoice_json = json.dumps(invoice_data)
