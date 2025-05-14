@@ -522,12 +522,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Close modal
                     checkoutModal.hide();
                     
-                    // Show receipt or success message with cashier name
+                    // Show receipt or success message with cashier name and eTIMS data if available
                     showReceiptModal(
                         result.reference, 
                         selectedPaymentMethod, 
                         cart.totalAmount,
-                        result.cashier_name
+                        result.cashier_name,
+                        result.etims || null
                     );
                     
                     // Clear cart
@@ -730,7 +731,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Show receipt modal
-    function showReceiptModal(reference, paymentMethod, amount, cashierName) {
+    function showReceiptModal(reference, paymentMethod, amount, cashierName, etimsData) {
+        // Create a formatted date for the receipt
+        const receiptDate = new Date().toLocaleString();
+        
+        // Check if we have eTIMS data to display
+        const hasEtimsData = etimsData && (etimsData.status === 'transmitted' || etimsData.status === 'queued' || etimsData.status === 'queued_after_failure');
+        
         const modal = document.createElement('div');
         modal.innerHTML = `
             <div class="modal fade" id="receiptModal" tabindex="-1" aria-hidden="true">
@@ -745,12 +752,34 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <i class="fas fa-check-circle text-success fa-3x"></i>
                                 <h4 class="mt-2">Payment Successful</h4>
                             </div>
-                            <div>
+                            <div class="mb-3">
+                                <h5 class="fw-bold mb-2">TujaraHub</h5>
+                                <p class="mb-0">Cloud Point of Sale System</p>
+                                <p class="small mb-3">Receipt</p>
+                                <hr>
                                 <p><strong>Sale Reference:</strong> ${reference}</p>
                                 <p><strong>Payment Method:</strong> ${paymentMethod.toUpperCase()}</p>
                                 <p><strong>Amount:</strong> ${formatCurrency(amount)}</p>
-                                <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+                                <p><strong>Date:</strong> ${receiptDate}</p>
                                 <p><strong>Served By:</strong> ${cashierName || 'Unknown'}</p>
+                                ${hasEtimsData ? `
+                                <hr>
+                                <div class="mt-3 mb-3">
+                                    <h6 class="fw-bold">KRA eTIMS Information</h6>
+                                    <p class="mb-1 small">This is a KRA approved Electronic Tax Invoice</p>
+                                    <p class="mb-1"><strong>KRA PIN:</strong> ${etimsData.tax_pin || 'N/A'}</p>
+                                    <p class="mb-1"><strong>Device ID:</strong> ${etimsData.device_id || 'N/A'}</p>
+                                    <p class="mb-1"><strong>Fiscal Receipt No:</strong> ${etimsData.fiscal_receipt_number || 'N/A'}</p>
+                                    ${etimsData.qr_code ? `
+                                    <div class="text-center mt-2">
+                                        <img src="data:image/png;base64,${etimsData.qr_code}" style="max-width: 150px;" alt="KRA QR Code">
+                                        <p class="small mt-1">Scan to verify</p>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                ` : ''}
+                                <hr>
+                                <p class="small mt-3">Thank you for your business!</p>
                             </div>
                         </div>
                         <div class="modal-footer">
