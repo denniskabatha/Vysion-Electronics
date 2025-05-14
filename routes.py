@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
@@ -10,18 +10,20 @@ import io
 import json
 import random
 import os
+import base64
 
 from app import db
 from models import (
     User, Role, Store, Product, Category, Inventory,
     Sale, SaleItem, Customer, Payment, Supplier,
-    ProductTemplate, LabelTemplate
+    ProductTemplate, LabelTemplate, HardwareConfiguration
 )
 from auth import (
     login_required, admin_required, manager_required, not_cashier_required,
     register_user, authenticate_user, load_logged_in_user
 )
 from mpesa import initiate_stk_push, check_transaction_status
+import etims
 
 def register_routes(app):
     """Register all application routes."""
@@ -1011,22 +1013,117 @@ def register_routes(app):
     def settings():
         store_id = session.get('store_id')
         store = Store.query.get(store_id)
+        hardware_config = HardwareConfiguration.query.filter_by(store_id=store_id).first()
+        
+        if not hardware_config:
+            # Create a default hardware configuration if none exists
+            hardware_config = HardwareConfiguration(store_id=store_id)
+            db.session.add(hardware_config)
+            db.session.commit()
+        
+        # Get current eTIMS settings from app config
+        etims_settings = {
+            'enable_tims': current_app.config.get('ENABLE_TIMS', False),
+            'tax_pin': current_app.config.get('TAX_PIN', ''),
+            'tims_device_id': current_app.config.get('TIMS_DEVICE_ID', ''),
+            'tims_cert_serial': current_app.config.get('TIMS_CERT_SERIAL', ''),
+            'vat_registration_date': current_app.config.get('VAT_REGISTRATION_DATE', ''),
+            'tims_url': current_app.config.get('TIMS_URL', 'https://etims.kra.go.ke/api/v1/'),
+            'enable_qr_code': current_app.config.get('ENABLE_QR_CODE', True),
+            'default_tax_rate': current_app.config.get('DEFAULT_TAX_RATE', 16.0)
+        }
         
         if request.method == 'POST':
             try:
+                # Store information
                 store.name = request.form.get('name')
                 store.location = request.form.get('location')
                 store.phone = request.form.get('phone')
                 store.email = request.form.get('email')
                 
+                # Hardware configuration
+                hardware_config.barcode_scanner_type = request.form.get('barcode_scanner', 'usb_hid')
+                hardware_config.receipt_printer_type = request.form.get('receipt_printer', 'browser')
+                hardware_config.cash_drawer_type = request.form.get('cash_drawer', 'manual')
+                hardware_config.card_reader_type = request.form.get('card_reader', 'manual')
+                hardware_config.updated_at = datetime.utcnow()
+                
+                # Save KRA eTIMS settings to application config
+                current_app.config['ENABLE_TIMS'] = 'enable_tims' in request.form
+                current_app.config['TAX_PIN'] = request.form.get('tax_pin', '')
+                current_app.config['TIMS_DEVICE_ID'] = request.form.get('tims_device_id', '')
+                current_app.config['TIMS_CERT_SERIAL'] = request.form.get('tims_cert_serial', '')
+                current_app.config['VAT_REGISTRATION_DATE'] = request.form.get('vat_registration_date', '')
+                
+                # Handle custom URL if selected
+                tims_url = request.form.get('tims_url', '')
+                if tims_url == 'custom':
+                    custom_url = request.form.get('custom_tims_url', '')
+                    if custom_url:
+                        current_app.config['TIMS_URL'] = custom_url
+                else:
+                    current_app.config['TIMS_URL'] = tims_url
+                
+                current_app.config['ENABLE_QR_CODE'] = 'enable_qr_code' in request.form
+                current_app.config['DEFAULT_TAX_RATE'] = float(request.form.get('default_tax_rate', 16.0))
+                
+                # Handle certificate upload if provided
+                cert_file = request.files.get('tims_certificate')
+                if cert_file and cert_file.filename:
+                    # Ensure the instance directory exists
+                    os.makedirs('instance', exist_ok=True)
+                    
+                    # Save the certificate file
+                    cert_path = os.path.join('instance', 'etims_certificate.p12')
+                    cert_file.save(cert_path)
+                    current_app.config['TIMS_CERTIFICATE_PATH'] = cert_path
+                    
+                    # Save certificate password if provided
+                    cert_password = request.form.get('cert_password')
+                    if cert_password:
+                        current_app.config['TIMS_CERTIFICATE_PASSWORD'] = cert_password
+                
                 db.session.commit()
+                
+                # Save settings to a persistent file for reloading on app restart
+                try:
+                    config_file = os.path.join('instance', 'config.json')
+                    with open(config_file, 'w') as f:
+                        json.dump({
+                            'ENABLE_TIMS': current_app.config.get('ENABLE_TIMS', False),
+                            'TAX_PIN': current_app.config.get('TAX_PIN', ''),
+                            'TIMS_DEVICE_ID': current_app.config.get('TIMS_DEVICE_ID', ''),
+                            'TIMS_CERT_SERIAL': current_app.config.get('TIMS_CERT_SERIAL', ''),
+                            'VAT_REGISTRATION_DATE': current_app.config.get('VAT_REGISTRATION_DATE', ''),
+                            'TIMS_URL': current_app.config.get('TIMS_URL', ''),
+                            'ENABLE_QR_CODE': current_app.config.get('ENABLE_QR_CODE', True),
+                            'DEFAULT_TAX_RATE': current_app.config.get('DEFAULT_TAX_RATE', 16.0)
+                        }, f, indent=2)
+                except Exception as e:
+                    logger.error(f"Failed to save config file: {str(e)}")
+                
                 flash('Store settings updated successfully!', 'success')
                 
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error updating settings: {str(e)}', 'danger')
         
-        return render_template('settings.html', store=store)
+        # Get the updated etims settings for the template
+        etims_settings.update({
+            'enable_tims': current_app.config.get('ENABLE_TIMS', False),
+            'tax_pin': current_app.config.get('TAX_PIN', ''),
+            'tims_device_id': current_app.config.get('TIMS_DEVICE_ID', ''),
+            'tims_cert_serial': current_app.config.get('TIMS_CERT_SERIAL', ''),
+            'vat_registration_date': current_app.config.get('VAT_REGISTRATION_DATE', ''),
+            'tims_url': current_app.config.get('TIMS_URL', 'https://etims.kra.go.ke/api/v1/'),
+            'enable_qr_code': current_app.config.get('ENABLE_QR_CODE', True),
+            'default_tax_rate': current_app.config.get('DEFAULT_TAX_RATE', 16.0)
+        })
+        
+        return render_template('settings.html', 
+                              store=store, 
+                              hardware_config=hardware_config,
+                              etims_settings=etims_settings)
     
     # API routes for AJAX calls
     @app.route('/api/products', methods=['GET'])

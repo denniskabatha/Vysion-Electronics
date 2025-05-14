@@ -15,4 +15,7 @@ dependencies = [
     "flask-login>=0.6.3",
     "flask-jwt-extended>=4.7.1",
     "requests>=2.32.3",
+    "cryptography>=44.0.3",
+    "qrcode>=8.2",
+    "pillow>=11.2.1",
 ]
