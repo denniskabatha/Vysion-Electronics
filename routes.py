@@ -28,6 +28,49 @@ import etims
 def register_routes(app):
     """Register all application routes."""
     
+    @app.route('/api/category/add', methods=['POST'])
+    @login_required
+    @manager_required
+    def add_category_ajax():
+        """AJAX endpoint to add a new category."""
+        try:
+            # Get data from request
+            name = request.form.get('name')
+            description = request.form.get('description', '')
+            
+            if not name:
+                return jsonify({'success': False, 'message': 'Category name is required'})
+            
+            # Check if category already exists
+            existing_category = Category.query.filter_by(name=name).first()
+            if existing_category:
+                return jsonify({
+                    'success': True, 
+                    'message': 'Category already exists',
+                    'category_id': existing_category.id,
+                    'category_name': existing_category.name
+                })
+            
+            # Create new category
+            new_category = Category()
+            new_category.name = name
+            new_category.description = description
+            
+            db.session.add(new_category)
+            db.session.commit()
+            
+            # Return success response
+            return jsonify({
+                'success': True,
+                'message': 'Category added successfully',
+                'category_id': new_category.id,
+                'category_name': new_category.name
+            })
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"Error adding category: {str(e)}")
+            return jsonify({'success': False, 'message': f'An error occurred: {str(e)}'})
+    
     # Register authentication middleware
     app.before_request(load_logged_in_user)
     
@@ -679,11 +722,30 @@ def register_routes(app):
                 cost_price = request.form.get('cost_price')
                 tax_rate = request.form.get('tax_rate', 0)
                 category_id = request.form.get('category_id')
+                new_category_name = request.form.get('new_category_name')
                 supplier_id = request.form.get('supplier_id')
                 quantity = request.form.get('quantity', 0)
                 reorder_level = request.form.get('reorder_level', 5)
                 
                 try:
+                    # Handle new category creation if needed
+                    if category_id == 'new_category' and new_category_name:
+                        # Check if category already exists
+                        existing_category = Category.query.filter_by(name=new_category_name).first()
+                        if existing_category:
+                            category_id = existing_category.id
+                        else:
+                            # Create new category
+                            new_category = Category()
+                            new_category.name = new_category_name
+                            new_category.description = f"Category created during product addition"
+                            
+                            db.session.add(new_category)
+                            db.session.flush()  # Get ID without committing
+                            
+                            category_id = new_category.id
+                            flash(f'New category "{new_category_name}" created successfully!', 'success')
+                    
                     # Create product
                     product = Product(
                         name=name,
