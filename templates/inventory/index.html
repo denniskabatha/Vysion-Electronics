@@ -8,9 +8,16 @@
         <h1 class="mb-0 mb-3 mb-sm-0"><i class="fas fa-boxes me-2"></i>Inventory Management</h1>
         
         {% if session.get('role') in ['admin', 'manager'] %}
-        <a href="{{ url_for('add_product') }}" class="btn btn-primary">
-            <i class="fas fa-plus me-1"></i> Add New Product
-        </a>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('add_product') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Add New Product
+            </a>
+            {% if session.get('role') == 'admin' %}
+            <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#clearInventoryModal">
+                <i class="fas fa-trash-alt me-1"></i> Clear Inventory
+            </button>
+            {% endif %}
+        </div>
         {% endif %}
     </div>
     
@@ -145,6 +152,50 @@
 </div>
 {% endblock %}
 
+<!-- Clear Inventory Confirmation Modal -->
+<div class="modal fade" id="clearInventoryModal" tabindex="-1" aria-labelledby="clearInventoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="clearInventoryModalLabel">Clear Entire Inventory</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i> <strong>Warning!</strong> This action cannot be undone.
+                </div>
+                <p>You are about to delete <strong>ALL products and inventory data</strong> from the current store. This will permanently remove all inventory records and product data.</p>
+                <p>Please type <strong>DELETE</strong> below to confirm:</p>
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="confirmationText" placeholder="Type DELETE to confirm">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{{ url_for('clear_inventory') }}" method="post">
+                    <input type="hidden" name="store_id" value="{{ session.get('store_id') }}">
+                    <button type="submit" id="confirmClearBtn" class="btn btn-danger" disabled>
+                        <i class="fas fa-trash-alt me-1"></i> Clear Entire Inventory
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% block extra_js %}
 <script src="{{ url_for('static', filename='js/inventory.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle confirmation text for clearing inventory
+    const confirmationInput = document.getElementById('confirmationText');
+    const confirmButton = document.getElementById('confirmClearBtn');
+    
+    if (confirmationInput && confirmButton) {
+        confirmationInput.addEventListener('input', function() {
+            confirmButton.disabled = this.value !== 'DELETE';
+        });
+    }
+});
+</script>
 {% endblock %}

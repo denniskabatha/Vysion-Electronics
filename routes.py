@@ -28,6 +28,53 @@ import etims
 def register_routes(app):
     """Register all application routes."""
     
+    @app.route('/inventory/clear', methods=['POST'])
+    @login_required
+    @admin_required
+    def clear_inventory():
+        """Clear the entire inventory for the current store."""
+        try:
+            store_id = session.get('store_id')
+            if not store_id:
+                flash('Store not selected.', 'danger')
+                return redirect(url_for('inventory'))
+                
+            # First get all product IDs for the current store
+            inventory_items = Inventory.query.filter_by(store_id=store_id).all()
+            product_ids = [item.product_id for item in inventory_items]
+            
+            # Delete inventory items
+            deleted_count = 0
+            if inventory_items:
+                for item in inventory_items:
+                    db.session.delete(item)
+                    deleted_count += 1
+                
+                # Delete the products if they're not in any other store's inventory
+                for product_id in product_ids:
+                    # Check if product exists in any other store
+                    other_inventory = Inventory.query.filter(
+                        Inventory.product_id == product_id,
+                        Inventory.store_id != store_id
+                    ).first()
+                    
+                    if not other_inventory:
+                        product = Product.query.get(product_id)
+                        if product:
+                            db.session.delete(product)
+                
+                db.session.commit()
+                flash(f'Successfully removed {deleted_count} items from inventory.', 'success')
+            else:
+                flash('No inventory items to delete.', 'info')
+                
+            return redirect(url_for('inventory'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error clearing inventory: {str(e)}', 'danger')
+            return redirect(url_for('inventory'))
+    
     @app.route('/api/category/add', methods=['POST'])
     @login_required
     @manager_required
