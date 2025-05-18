@@ -67,28 +67,18 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)  # Session timeou
 login_limiter = RateLimiter(max_requests=10, window_seconds=60)  # 10 login attempts per minute
 api_limiter = RateLimiter(max_requests=200, window_seconds=60)  # 200 API requests per minute
 
-# Configure database connection - using SQLite by default with fallback
-db_url = os.environ.get("DATABASE_URL", "sqlite:///kenyan_pos.db")
+# Configure database connection - using SQLite for simplicity
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kenyan_pos.db"
 
-# If PostgreSQL is available, use it with optimizations, otherwise use SQLite
-if db_url.startswith('postgresql'):
-    app.config["SQLALCHEMY_DATABASE_URI"] = db_url
-    # Database optimizations for high workload handling with PostgreSQL
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_size": 10,  # Maximum connections in the pool
-        "max_overflow": 20,  # Maximum overflow connections when pool is full
-        "pool_timeout": 30,  # Seconds to wait before timing out on pool get
-        "pool_recycle": 1800,  # Recycle connections after 30 minutes
-        "pool_pre_ping": True,  # Verify connections before use to avoid stale connections
-    }
-else:
-    # SQLite configuration
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kenyan_pos.db"
-    # SQLite-specific optimizations
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_pre_ping": True,  # Verify connections before use
-        "connect_args": {"check_same_thread": False}  # Allow access from multiple threads
-    }
+# Set SQLAlchemy options
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True  # Verify connections before use
+}
+
+# SQLite-specific connection arguments
+app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"] = {
+    "check_same_thread": False  # Allow access from multiple threads for SQLite
+}
 
 # Load KRA eTIMS settings if configuration file exists
 etims_config_file = os.path.join('instance', 'config.json')
