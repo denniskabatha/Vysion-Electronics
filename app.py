@@ -1,15 +1,45 @@
 import os
 import json
 import logging
-from flask import Flask
+import time
+from datetime import timedelta
+from flask import Flask, request, abort
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from werkzeug.middleware.proxy_fix import ProxyFix
+import functools
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
+
+# Simple in-memory rate limiter
+class RateLimiter:
+    def __init__(self, max_requests=100, window_seconds=60):
+        self.max_requests = max_requests  # Max requests per window
+        self.window_seconds = window_seconds  # Window size in seconds
+        self.requests = {}  # {ip: [(timestamp, count), ...]}
+    
+    def is_rate_limited(self, ip):
+        now = time.time()
+        
+        # Remove expired entries
+        if ip in self.requests:
+            self.requests[ip] = [r for r in self.requests[ip] 
+                               if now - r[0] < self.window_seconds]
+        else:
+            self.requests[ip] = []
+            
+        # Count recent requests
+        total = sum(r[1] for r in self.requests[ip])
+        
+        if total >= self.max_requests:
+            return True
+            
+        # Record this request
+        self.requests[ip].append((now, 1))
+        return False
 
 # Define base class for SQLAlchemy models
 class Base(DeclarativeBase):
@@ -26,6 +56,16 @@ app.secret_key = os.environ.get("SESSION_SECRET", "kenya_pos_default_secret_key"
 
 # Configure proxy fix middleware for proper URL generation
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+# Security settings
+app.config['SESSION_COOKIE_SECURE'] = True  # Only send cookies over HTTPS
+app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to cookies
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # Restrict cookie sending to same site
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)  # Session timeout
+
+# Create rate limiter for sensitive routes
+login_limiter = RateLimiter(max_requests=10, window_seconds=60)  # 10 login attempts per minute
+api_limiter = RateLimiter(max_requests=200, window_seconds=60)  # 200 API requests per minute
 
 # Configure database connection - using SQLite
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///kenyan_pos.db"
