@@ -1,4 +1,4 @@
-from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file, current_app
+from flask import render_template, request, redirect, url_for, flash, jsonify, session, send_file, current_app, abort
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash
 from werkzeug.utils import secure_filename
@@ -27,6 +27,49 @@ import etims
 
 def register_routes(app):
     """Register all application routes."""
+    
+    # Security middleware to add security headers to all responses
+    @app.after_request
+    def add_security_headers(response):
+        """Add security headers to help protect against common attacks."""
+        # Prevent clickjacking attacks
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        # Help prevent XSS attacks
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        # Enable the XSS filter built into most recent web browsers
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        # Instruct browsers to use HTTPS for the next year
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        # Restrict where resources can be loaded from
+        response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://code.jquery.com https://cdnjs.cloudflare.com 'unsafe-inline'; style-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.replit.com 'unsafe-inline'; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com"
+        # Prevent MIME type sniffing
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        return response
+        
+    # Middleware to protect against brute force login attempts
+    @app.before_request
+    def check_request_security():
+        """Check for rate limiting and other security concerns."""
+        # Skip for static files
+        if request.path.startswith('/static/'):
+            return None
+            
+        # Get client IP
+        client_ip = request.remote_addr
+        
+        # Rate limit login attempts
+        if request.path == '/login' and request.method == 'POST':
+            from app import login_limiter
+            if login_limiter.is_rate_limited(client_ip):
+                app.logger.warning(f"Rate limit exceeded for login: {client_ip}")
+                return abort(429, "Too many login attempts. Please try again later.")
+                
+        # Rate limit sensitive API endpoints
+        if request.path.startswith('/api/'):
+            from app import api_limiter
+            if api_limiter.is_rate_limited(client_ip):
+                app.logger.warning(f"Rate limit exceeded for API: {client_ip}")
+                return abort(429, "Too many requests. Please try again later.")
     
     @app.route('/inventory/clear', methods=['POST'])
     @login_required
