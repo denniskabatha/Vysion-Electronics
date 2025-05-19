@@ -24,6 +24,7 @@ Flask
 Flask-Cors
 Flask-JWT-Extended
 Flask-Login
+gunicorn
 Flask-Migrate
 Flask-RESTful
 Flask-SocketIO
