@@ -12,7 +12,7 @@ import random
 import os
 import base64
 
-from app import db
+from extensions import db
 from models import (
     User, Role, Store, Product, Category, Inventory,
     Sale, SaleItem, Customer, Payment, Supplier,
@@ -355,9 +355,11 @@ def register_routes(app):
                     product_id=item['product_id'],
                     quantity=item['quantity'],
                     unit_price=item['unit_price'],
-                    tax_rate=item.get('tax_rate', 0),
-                    discount_amount=item.get('discount_amount', 0),
-                    total_price=item['total_price']
+                    # VVV THESE ARE THE CORRECTED LINES VVV
+                    tax_rate_applied=item.get('tax_rate', 0.0),          # Use new field: tax_rate_applied
+                    discount_amount_applied=item.get('discount_amount', 0.0), # Use new field: discount_amount_applied
+                    line_total=item.get('total_price', 0.0)             # Use new field: line_total (ensure item['total_price'] from frontend IS the line total)
+                    # ^^^ THESE ARE THE CORRECTED LINES ^^^
                 )
                 db.session.add(sale_item)
                 

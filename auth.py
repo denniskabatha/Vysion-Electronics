@@ -2,7 +2,7 @@ from functools import wraps
 from flask import session, redirect, url_for, flash, g, request
 import logging
 
-from app import db
+from extensions import db
 from models import User, Role
 
 def login_required(view):

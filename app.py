@@ -1,15 +1,19 @@
+# /home/mwangidennis/CloudSalesPOS/app.py
 import os
 import json
 import logging
 import time
 from datetime import timedelta
 from flask import Flask, request, abort
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
+# Remove: from flask_sqlalchemy import SQLAlchemy  # SQLAlchemy itself is now initialized in extensions
+# Remove: from sqlalchemy.orm import DeclarativeBase # Base class is now in extensions
 from flask_migrate import Migrate
 from flask_jwt_extended import JWTManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 import functools
+
+# Import db instance from extensions.py
+from extensions import db # ADD THIS LINE
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,33 +24,34 @@ class RateLimiter:
         self.max_requests = max_requests  # Max requests per window
         self.window_seconds = window_seconds  # Window size in seconds
         self.requests = {}  # {ip: [(timestamp, count), ...]}
-    
+
     def is_rate_limited(self, ip):
         now = time.time()
-        
+
         # Remove expired entries
         if ip in self.requests:
-            self.requests[ip] = [r for r in self.requests[ip] 
-                               if now - r[0] < self.window_seconds]
+            self.requests[ip] = [r for r in self.requests[ip]
+                                 if now - r[0] < self.window_seconds]
         else:
             self.requests[ip] = []
-            
+
         # Count recent requests
         total = sum(r[1] for r in self.requests[ip])
-        
+
         if total >= self.max_requests:
             return True
-            
+
         # Record this request
         self.requests[ip].append((now, 1))
         return False
 
-# Define base class for SQLAlchemy models
-class Base(DeclarativeBase):
-    pass
-
-# Initialize SQLAlchemy
-db = SQLAlchemy(model_class=Base)
+# REMOVE THIS BLOCK - It's now in extensions.py
+# # Define base class for SQLAlchemy models
+# class Base(DeclarativeBase):
+#     pass
+#
+# # Initialize SQLAlchemy
+# db = SQLAlchemy(model_class=Base)
 
 # Create Flask application
 app = Flask(__name__)
@@ -76,9 +81,11 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 # SQLite-specific connection arguments
-app.config["SQLALCHEMY_ENGINE_OPTIONS"]["connect_args"] = {
-    "check_same_thread": False  # Allow access from multiple threads for SQLite
-}
+# This correctly merges with the previous SQLALCHEMY_ENGINE_OPTIONS
+app.config["SQLALCHEMY_ENGINE_OPTIONS"].update({
+    "connect_args": {"check_same_thread": False}  # Allow access from multiple threads for SQLite
+})
+
 
 # Load KRA eTIMS settings if configuration file exists
 etims_config_file = os.path.join('instance', 'config.json')
@@ -86,7 +93,7 @@ if os.path.exists(etims_config_file):
     try:
         with open(etims_config_file, 'r') as f:
             etims_config = json.load(f)
-            
+
         # Apply eTIMS configuration to app
         app.config.update({
             'ENABLE_TIMS': etims_config.get('ENABLE_TIMS', False),
@@ -98,12 +105,12 @@ if os.path.exists(etims_config_file):
             'ENABLE_QR_CODE': etims_config.get('ENABLE_QR_CODE', True),
             'DEFAULT_TAX_RATE': etims_config.get('DEFAULT_TAX_RATE', 16.0)
         })
-        
+
         # Check for certificate file
         cert_path = os.path.join('instance', 'etims_certificate.p12')
         if os.path.exists(cert_path):
             app.config['TIMS_CERTIFICATE_PATH'] = cert_path
-            
+
         logging.info("KRA eTIMS configuration loaded successfully")
     except Exception as e:
         logging.error(f"Failed to load KRA eTIMS configuration: {str(e)}")
@@ -120,18 +127,19 @@ else:
         'DEFAULT_TAX_RATE': 16.0
     })
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# SQLite-specific options
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "connect_args": {"check_same_thread": False},
-    "pool_pre_ping": True,
-}
+# Note: SQLALCHEMY_ENGINE_OPTIONS was already set and updated.
+# The following would overwrite the pool_pre_ping if it wasn't merged correctly above.
+# Ensured above that connect_args is added to the existing dictionary.
+# app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+#     "connect_args": {"check_same_thread": False},
+#     "pool_pre_ping": True, # This was already set
+# }
 
 # Initialize JWT for authentication
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", app.secret_key)
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = 86400  # 24 hours
-jwt = JWTManager(app)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(seconds=86400) # 24 hours, ensure timedelta for consistency
 
-# Initialize database with app
+# Initialize database with app (db is now the imported instance)
 db.init_app(app)
 
 # Initialize migrations
@@ -140,11 +148,13 @@ migrate = Migrate(app, db)
 # Import routes after app is created to avoid circular imports
 with app.app_context():
     # Import models so they are registered with SQLAlchemy
-    from models import User, Role, Store, Product, Category, Inventory, Sale, SaleItem, Customer, Payment, Supplier
-    
+    # This will work now because models.py imports 'db' from 'extensions.py'
+    from models import User, Role, Store, Product, Category, Inventory, Sale, SaleItem, Customer, Payment, Supplier, ProductTemplate, LabelTemplate, HardwareConfiguration
+    # Added missing models to the import list based on models.py
+
     # Create all tables if they don't exist
     db.create_all()
-    
+
     # Import routes after DB initialization
     from routes import register_routes
     register_routes(app)
@@ -158,4 +168,4 @@ app.config["MPESA_CALLBACK_URL"] = os.environ.get("MPESA_CALLBACK_URL", "")
 app.config["MPESA_ENVIRONMENT"] = os.environ.get("MPESA_ENVIRONMENT", "sandbox")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000)
