@@ -12,7 +12,7 @@ catalogue==2.0.10
 certifi==2024.12.14
 cffi==1.17.1
 charset-normalizer==2.0.12
-click==8.1.8
+click
 coloredlogs==15.0.1
 contourpy==1.1.1
 cryptography==45.0.2
